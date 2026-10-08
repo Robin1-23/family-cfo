@@ -1,0 +1,32 @@
+rules_version = '2';
+
+// Family CFO — Cloud Storage rules. Access follows the household's `roles` map in Firestore.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    match /households/{hid}/members/{mid}/documents/{did}/{fileName} {
+
+      function role() {
+        return firestore.get(/databases/(default)/documents/households/$(hid)).data.roles.get(request.auth.uid, null);
+      }
+
+      allow read: if request.auth != null && role() != null;
+
+      allow create: if request.auth != null
+        && role() in ['owner', 'co_manager']
+        && request.resource.size > 0
+        && request.resource.size <= 20 * 1024 * 1024
+        && request.resource.contentType.matches('application/pdf|image/(jpeg|png|heic|webp)');
+
+      allow update: if false;
+
+      allow delete: if request.auth != null && role() in ['owner', 'co_manager'];
+    }
+
+    // Everything else is closed.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

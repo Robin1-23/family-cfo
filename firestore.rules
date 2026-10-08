@@ -1,0 +1,165 @@
+rules_version = '2';
+
+// Family CFO — Firestore security rules (Foundation sprint).
+// Every household document carries a `roles` map (uid -> 'owner' | 'co_manager' | 'viewer');
+// all access to a household and its subcollections is decided from that map.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function me() {
+      return request.auth.uid;
+    }
+
+    function householdPath(hid) {
+      return /databases/$(database)/documents/households/$(hid);
+    }
+
+    function roleBefore(hid) {
+      return get(householdPath(hid)).data.roles.get(me(), null);
+    }
+
+    // getAfter() lets the creating batch (household + members) authorise itself.
+    function roleAfter(hid) {
+      return getAfter(householdPath(hid)).data.roles.get(me(), null);
+    }
+
+    function isShortString(v, maxLen) {
+      return v is string && v.size() > 0 && v.size() <= maxLen;
+    }
+
+    // ---------------------------------------------------------------- users
+    match /users/{userId} {
+      allow read: if signedIn() && me() == userId;
+
+      allow create: if signedIn() && me() == userId
+        && request.resource.data.keys().hasOnly(['phone', 'createdAt', 'activeHouseholdId'])
+        && request.resource.data.phone == request.auth.token.phone_number
+        && (!('activeHouseholdId' in request.resource.data)
+            || request.resource.data.activeHouseholdId == null
+            || roleAfter(request.resource.data.activeHouseholdId) != null);
+
+      allow update: if signedIn() && me() == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeHouseholdId'])
+        && (request.resource.data.activeHouseholdId == null
+            || roleAfter(request.resource.data.activeHouseholdId) != null);
+
+      allow delete: if false;
+    }
+
+    // ----------------------------------------------------------- households
+    match /households/{hid} {
+
+      allow read: if signedIn() && resource.data.roles.get(me(), null) != null;
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'plan', 'roles', 'createdAt'])
+        && isShortString(request.resource.data.name, 60)
+        && request.resource.data.ownerUid == me()
+        && request.resource.data.plan == 'free'
+        && request.resource.data.roles.keys().hasOnly([me()])
+        && request.resource.data.roles[me()] == 'owner';
+
+      // Only the owner may rename or change roles; the owner can never be demoted.
+      // Plan changes come from the billing backend (Admin SDK), never the client.
+      allow update: if signedIn()
+        && resource.data.roles.get(me(), null) == 'owner'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'roles'])
+        && isShortString(request.resource.data.name, 60)
+        && request.resource.data.roles[resource.data.ownerUid] == 'owner';
+
+      allow delete: if false;
+
+      // ---------------------------------------------------------- members
+      match /members/{mid} {
+
+        function validMember(d) {
+          return d.keys().hasOnly(['name', 'relation', 'uid', 'role', 'language', 'consentStatus',
+                                   'birthYear', 'city', 'createdAt'])
+            && isShortString(d.name, 60)
+            && d.relation in ['self', 'mother', 'father', 'spouse', 'sibling', 'child', 'grandparent', 'other']
+            && d.language in ['en', 'hi']
+            && (d.birthYear == null || (d.birthYear is number && math.floor(d.birthYear) == d.birthYear && d.birthYear >= 1900 && d.birthYear <= 2100))
+            && (d.city == null || isShortString(d.city, 60));
+        }
+
+        allow read: if signedIn() && roleBefore(hid) != null;
+
+        // A member card is either the creator themselves ('self', linked to their uid, carrying
+        // their household role) or an unlinked family member who starts as a viewer with
+        // consent pending until they approve for themselves.
+        allow create: if signedIn()
+          && roleAfter(hid) in ['owner', 'co_manager']
+          && validMember(request.resource.data)
+          && (
+            (request.resource.data.relation == 'self'
+              && request.resource.data.uid == me()
+              && request.resource.data.role == roleAfter(hid)
+              && request.resource.data.consentStatus == 'self')
+            ||
+            (request.resource.data.relation != 'self'
+              && request.resource.data.uid == null
+              && request.resource.data.role == 'viewer'
+              && request.resource.data.consentStatus == 'pending')
+          );
+
+        allow update: if signedIn()
+          && roleBefore(hid) in ['owner', 'co_manager']
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['name', 'relation', 'language', 'birthYear', 'city'])
+          && validMember(request.resource.data)
+          && (resource.data.relation == 'self') == (request.resource.data.relation == 'self');
+
+        allow delete: if signedIn()
+          && roleBefore(hid) == 'owner'
+          && resource.data.relation != 'self';
+      }
+
+      // -------------------------------------------------------- documents
+      match /documents/{did} {
+
+        allow read: if signedIn() && roleBefore(hid) != null;
+
+        allow create: if signedIn()
+          && roleBefore(hid) in ['owner', 'co_manager']
+          && request.resource.data.keys().hasOnly(['memberId', 'docType', 'title', 'fileName', 'storagePath',
+                                                   'contentType', 'sizeBytes', 'ocrStatus', 'uploadedBy',
+                                                   'createdAt'])
+          && exists(/databases/$(database)/documents/households/$(hid)/members/$(request.resource.data.memberId))
+          && request.resource.data.docType in ['health_policy', 'term_policy', 'life_policy', 'vehicle_policy',
+                                               'fixed_deposit', 'mutual_fund', 'loan', 'property',
+                                               'id_document', 'tax', 'other']
+          && isShortString(request.resource.data.title, 120)
+          && isShortString(request.resource.data.fileName, 80)
+          && request.resource.data.storagePath ==
+               'households/' + hid + '/members/' + request.resource.data.memberId
+               + '/documents/' + did + '/' + request.resource.data.fileName
+          && request.resource.data.sizeBytes is number
+          && math.floor(request.resource.data.sizeBytes) == request.resource.data.sizeBytes
+          && request.resource.data.sizeBytes > 0
+          && request.resource.data.sizeBytes <= 20 * 1024 * 1024
+          && request.resource.data.ocrStatus == 'pending'
+          && request.resource.data.uploadedBy == me();
+
+        // Clients may fix the title or type; OCR status and extracted fields are written by Cloud Functions.
+        allow update: if signedIn()
+          && roleBefore(hid) in ['owner', 'co_manager']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'docType'])
+          && isShortString(request.resource.data.title, 120);
+
+        allow delete: if signedIn() && roleBefore(hid) in ['owner', 'co_manager'];
+      }
+
+      // --------------------------------------------------------- consents
+      // Written only by Cloud Functions (Admin SDK) when an external source is connected.
+      match /consents/{cid} {
+        allow read: if signedIn() && roleBefore(hid) != null;
+        allow write: if false;
+      }
+    }
+  }
+}

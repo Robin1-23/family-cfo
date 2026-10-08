@@ -41,3 +41,9 @@ example
 # generated native folders
 /ios
 /android
+
+# Firebase config files (download from the Firebase console; never commit)
+google-services.json
+GoogleService-Info.plist
+.firebase/
+*-debug.log
