@@ -50,6 +50,7 @@ function RootNavigator() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={status === 'signed_out'}>
+        <Stack.Screen name="welcome" />
         <Stack.Screen name="sign-in" />
       </Stack.Protected>
       <Stack.Protected guard={status === 'no_household'}>

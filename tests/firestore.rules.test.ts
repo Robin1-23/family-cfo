@@ -148,6 +148,24 @@ describe('members', () => {
   });
 });
 
+describe('health check answers', () => {
+  const ok = { healthCover: 'yes', healthCoverBand: '5l_10l', loans: 'no', termCover: null, fixedDeposits: 'yes', papersWith: 'family' };
+  it('lets an editor save well-formed answers on a member', async () => {
+    await createHouseholdAs(OWNER);
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'households', 'h1', 'members', 'mum'), { healthCheck: ok }));
+  });
+  it('rejects answers that skip or contradict the conditional questions, and strangers', async () => {
+    await createHouseholdAs(OWNER);
+    const ref = doc(as(OWNER), 'households', 'h1', 'members', 'mum');
+    await assertFails(updateDoc(ref, { healthCheck: { ...ok, healthCoverBand: null } }));
+    await assertFails(updateDoc(ref, { healthCheck: { ...ok, healthCover: 'no' } }));
+    await assertFails(updateDoc(ref, { healthCheck: { ...ok, loans: 'yes' } }));
+    await assertFails(updateDoc(ref, { healthCheck: { ...ok, papersWith: 'me' } }));
+    await assertFails(updateDoc(ref, { healthCheck: { ...ok, extra: 1 } }));
+    await assertFails(updateDoc(doc(as(OTHER), 'households', 'h1', 'members', 'mum'), { healthCheck: ok }));
+  });
+});
+
 describe('documents', () => {
   it('accepts a well-formed upload record from an editor', async () => {
     await createHouseholdAs(OWNER);
@@ -161,6 +179,48 @@ describe('documents', () => {
     await assertFails(setDoc(doc(db, 'households', 'h1', 'documents', 'd3'), vaultDoc('h1', 'd3', { uploadedBy: OTHER.uid })));
     await assertFails(setDoc(doc(db, 'households', 'h1', 'documents', 'd4'), vaultDoc('h1', 'd4', { ocrStatus: 'confirmed' })));
     await assertFails(setDoc(doc(db, 'households', 'h1', 'documents', 'd5'), vaultDoc('h1', 'd5', { memberId: 'ghost', storagePath: 'households/h1/members/ghost/documents/d5/policy.pdf' })));
+  });
+});
+
+describe('items', () => {
+  const item = (overrides: Record<string, unknown> = {}) => ({
+    type: 'health_policy', memberId: 'mum', provider: 'Star Health', numberLast4: '4567', amount: 500000,
+    premium: 18000, dueDate: '2026-08-15', maturityDate: null, nominee: 'Ramesh', sourceDocId: null,
+    confirmedBy: OWNER.uid, createdAt: serverTimestamp(), ...overrides,
+  });
+
+  it('accepts a manual item and one confirmed from the same member’s document', async () => {
+    await createHouseholdAs(OWNER);
+    const db = as(OWNER);
+    await assertSucceeds(setDoc(doc(db, 'households', 'h1', 'items', 'i1'), item()));
+    await setDoc(doc(db, 'households', 'h1', 'documents', 'd1'), vaultDoc('h1', 'd1'));
+    await assertSucceeds(setDoc(doc(db, 'households', 'h1', 'items', 'i2'), item({ sourceDocId: 'd1' })));
+  });
+  it('rejects full numbers, bad amounts or dates, strangers, and another member’s document', async () => {
+    await createHouseholdAs(OWNER);
+    const db = as(OWNER);
+    await setDoc(doc(db, 'households', 'h1', 'documents', 'd1'), vaultDoc('h1', 'd1'));
+    const bad = [
+      item({ numberLast4: '1234567890' }),
+      item({ amount: -1 }),
+      item({ amount: 12.5 }),
+      item({ dueDate: '15/08/2026' }),
+      item({ type: 'savings_account' }),
+      item({ confirmedBy: OTHER.uid }),
+      item({ memberId: 'self', sourceDocId: 'd1' }),
+      item({ extra: true }),
+    ];
+    for (const [n, data] of bad.entries()) {
+      await assertFails(setDoc(doc(db, 'households', 'h1', 'items', `bad${n}`), data));
+    }
+    await assertFails(setDoc(doc(as(OTHER), 'households', 'h1', 'items', 'x'), item({ confirmedBy: OTHER.uid })));
+  });
+  it('lets editors fix details but not re-point the source document', async () => {
+    await createHouseholdAs(OWNER);
+    const db = as(OWNER);
+    await setDoc(doc(db, 'households', 'h1', 'items', 'i1'), item());
+    await assertSucceeds(updateDoc(doc(db, 'households', 'h1', 'items', 'i1'), { premium: 19000 }));
+    await assertFails(updateDoc(doc(db, 'households', 'h1', 'items', 'i1'), { sourceDocId: 'd9' }));
   });
 });
 

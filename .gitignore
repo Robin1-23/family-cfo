@@ -47,3 +47,6 @@ google-services.json
 GoogleService-Info.plist
 .firebase/
 *-debug.log
+
+# Cloud Functions build output
+functions/lib/

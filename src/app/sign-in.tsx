@@ -1,7 +1,8 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { Button, Field, Notice, Screen, Text } from '@/components/ui';
+import { Button, Field, HeroCard, Notice, Screen } from '@/components/ui';
 import { formatIndianMobile, normalizeIndianMobile } from '@/lib/phone';
 import { authErrorMessage, confirmOtp, sendOtp, type Confirmation } from '@/services/auth';
 import { space } from '@/theme/tokens';
@@ -59,16 +60,20 @@ export default function SignInScreen() {
           <Button label="Send code" onPress={requestCode} loading={busy} />
         )
       }>
-      <View style={{ gap: space.sm, marginTop: space.xxl }}>
-        <Text variant="display">Family CFO</Text>
-        <Text variant="body" tone="soft">
-          Everything your family owns, owes and is covered for, in one place. Read-only, private, and never sold.
-        </Text>
-      </View>
+      <HeroCard
+        tint="peach"
+        icon={confirmation ? 'message-square' : 'smartphone'}
+        back={router.canGoBack()}
+        title={confirmation ? 'Enter your code' : 'Sign in'}
+        subtitle={
+          confirmation && phone
+            ? `We sent a 6-digit code to ${formatIndianMobile(phone)}.`
+            : 'Use your mobile number. No passwords to remember.'
+        }
+      />
 
       {confirmation && phone ? (
         <View style={{ gap: space.md }}>
-          <Text tone="soft">Code sent to {formatIndianMobile(phone)}.</Text>
           <Field
             label="6-digit code"
             value={code}

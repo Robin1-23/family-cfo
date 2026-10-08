@@ -4,7 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { Button, ChipGroup, Field, Notice, Panel, Screen, Text } from '@/components/ui';
+import { Button, ChipGroup, Field, HeroCard, Notice, Panel, Screen, Text } from '@/components/ui';
 import { DOC_TYPE_LABELS, DOC_TYPE_ORDER } from '@/lib/catalog';
 import { formatBytes, validateUpload } from '@/lib/files';
 import type { DocType } from '@/lib/types';
@@ -121,6 +121,13 @@ export default function UploadScreen() {
           disabled={uploading}
         />
       }>
+      <HeroCard
+        tint="dark"
+        icon="upload-cloud"
+        back
+        title="Add to vault"
+        subtitle="Snap a policy, FD receipt or ID. We’ll read the details for you to check."
+      />
       <ChipGroup<string>
         label="Whose document?"
         value={memberId}
@@ -166,7 +173,7 @@ export default function UploadScreen() {
         )}
         {uploading ? (
           <View style={{ height: 6, borderRadius: radius.pill, backgroundColor: p.surfaceSunk, overflow: 'hidden' }}>
-            <View style={{ width: `${Math.round((progress ?? 0) * 100)}%`, height: '100%', backgroundColor: p.primary }} />
+            <View style={{ width: `${Math.round((progress ?? 0) * 100)}%`, height: '100%', backgroundColor: p.lavender }} />
           </View>
         ) : null}
       </View>

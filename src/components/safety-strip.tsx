@@ -13,7 +13,7 @@ const SHORT: Partial<Record<DocType, string>> = {
 
 /**
  * The app's signature element: one segment per essential document type.
- * Filled teal when it is in the vault, an open marigold outline when missing.
+ * Filled lavender when it is in the vault, an open peach outline when missing.
  */
 export function SafetyStrip({ present, compact = false }: { present: DocType[]; compact?: boolean }) {
   const p = usePalette();
@@ -28,11 +28,12 @@ export function SafetyStrip({ present, compact = false }: { present: DocType[]; 
           <View key={t} style={{ flex: 1, gap: 4 }}>
             <View
               style={{
-                height: compact ? 6 : 10,
+                height: compact ? 8 : 14,
                 borderRadius: radius.pill,
-                backgroundColor: ok ? p.primary : 'transparent',
+                backgroundColor: ok ? p.lavender : p.peachWash,
                 borderWidth: ok ? 0 : 1.5,
-                borderColor: p.due,
+                borderColor: p.peach,
+                borderStyle: ok ? 'solid' : 'dashed',
               }}
             />
             {compact ? null : (

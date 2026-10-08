@@ -6,7 +6,7 @@ import type { MemberReadiness } from '@/lib/readiness';
 import type { Member } from '@/lib/types';
 import { radius, space, usePalette } from '@/theme/tokens';
 import { SafetyStrip } from './safety-strip';
-import { Text } from './ui';
+import { Avatar, Text } from './ui';
 
 export function ConsentBadge({ member }: { member: Member }) {
   const p = usePalette();
@@ -34,13 +34,12 @@ export function MemberRow({ member, readiness }: { member: Member; readiness: Me
         style={({ pressed }) => ({
           backgroundColor: p.surface,
           borderRadius: radius.lg,
-          borderWidth: 1,
-          borderColor: p.line,
-          padding: space.lg,
+          padding: space.lg + 2,
           gap: space.md,
           opacity: pressed ? 0.85 : 1,
         })}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+          <Avatar name={member.name} size={44} />
           <View style={{ flex: 1 }}>
             <Text variant="heading" numberOfLines={1}>
               {member.name}

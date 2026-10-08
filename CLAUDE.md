@@ -25,7 +25,8 @@ src/components/     ui.tsx (Text, Screen, Button, Field, ChipGroup, Panel, Notic
 src/lib/            pure logic — types, catalog, phone, files, permissions, readiness (unit tested)
 src/providers/      AuthProvider, HouseholdProvider (live Firestore listeners → useHousehold())
 src/services/       all Firebase calls (React Native Firebase v26, modular API)
-src/theme/tokens.ts "passbook" palette, spacing, type scale — use tokens, no raw hex in screens
+functions/            Cloud Functions: extractDocument (OCR via Claude), onItemCreated; pure parsing in extraction.ts
+src/theme/tokens.ts peach / lavender / charcoal palette, spacing, type scale — use tokens, no raw hex in screens
 firestore.rules / storage.rules   authorisation from households/{id}.roles
 tests/              lib.test.ts (npm test), firestore.rules.test.ts (npm run test:rules, needs emulator)
 ```
@@ -36,7 +37,7 @@ tests/              lib.test.ts (npm test), firestore.rules.test.ts (npm run tes
 - Any new Firestore field or collection: update `src/lib/types.ts`, `firestore.rules`, the rules tests, and the data model table in the spec.
 - Mirror rule logic client-side in `src/lib/permissions.ts` / `src/lib/files.ts` so the UI never offers an action the rules will reject.
 - Copy is plain, sentence case, user-facing (Hindi where the member's `language` is `hi`). Errors say what happened and how to fix it.
-- Design: one signature element per screen (the SafetyStrip on family surfaces); otherwise quiet panels and tokens.
+- Design: warm, rounded and card-led — big 28–34px cards on an off-white canvas, peach for what's due or missing, lavender for what's in place, charcoal pill buttons and a floating dark tab bar. Text on peach/lavender uses `onTint`; on dark cards `onBar`.
 
 ## Before you commit
 
@@ -47,4 +48,4 @@ npm run test:rules   # whenever firestore.rules changes (needs Java + emulator)
 
 ## Next up (Sprint 2)
 
-OCR extraction Cloud Function (`functions/`) + confirm screen → `items` collection → Coverage Radar → alert engine with WhatsApp → Emergency Mode → Hindi parent view → parent invite/consent flow. Details in the spec's roadmap.
+Coverage Radar (read from `items`) → alert engine with WhatsApp → Emergency Mode → Hindi parent view → parent invite/consent flow. Details in the spec's roadmap.

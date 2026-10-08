@@ -8,7 +8,9 @@ This repo is the **Foundation sprint** (weeks 1–3 of the MVP plan).
 
 | Area | Status |
 | --- | --- |
+| Welcome screen with trust promises | Done |
 | Phone OTP sign-in (+91) | Done |
+| Quick health check (onboarding quiz) → first Coverage Score | Done |
 | Onboarding: create household, add family in one step | Done |
 | Family dashboard with essential-papers score and "Do next" list | Done |
 | Member profiles, add member, WhatsApp invite (Hindi/English) | Done |
@@ -16,7 +18,8 @@ This repo is the **Foundation sprint** (weeks 1–3 of the MVP plan).
 | Roles (owner / co-manager / viewer) enforced in Firestore + Storage rules | Done |
 | Consent model: non-self members start as "pending consent" | Done |
 | Settings: profile, family, data & consent placeholder | Done |
-| OCR extraction, Coverage Radar, alerts, Emergency Mode, Hindi parent view | Next sprints |
+| OCR extraction (Claude, Cloud Function) + confirm screen → `items` | Done |
+| Coverage Radar, alerts, Emergency Mode, Hindi parent view | Next |
 
 ## Stack
 
@@ -59,7 +62,13 @@ tests/                 unit tests + Firestore rules tests
    npx firebase use --add          # pick your project
    npm run deploy:rules
    ```
-4. **Run a development build** (Expo Go won't work — React Native Firebase needs native code)
+4. **Deploy Cloud Functions** (OCR extraction; needs the Blaze plan)
+   ```bash
+   npm --prefix functions install
+   npx firebase functions:secrets:set ANTHROPIC_API_KEY
+   npx firebase deploy --only functions
+   ```
+5. **Run a development build** (Expo Go won't work — React Native Firebase needs native code)
    ```bash
    npx expo prebuild --clean
    npm run android                  # needs Android Studio

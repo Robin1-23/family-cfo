@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react';
+import { Feather } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import type { ComponentProps, ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -94,8 +96,8 @@ export function Button({
 }) {
   const p = usePalette();
   const inactive = disabled || loading;
-  const bg = kind === 'primary' ? p.primary : kind === 'secondary' ? p.primaryWash : 'transparent';
-  const fg = kind === 'primary' ? p.primaryInk : p.primary;
+  const bg = kind === 'primary' ? p.primary : kind === 'secondary' ? p.surface : 'transparent';
+  const fg = kind === 'primary' ? p.primaryInk : p.ink;
   return (
     <Pressable
       accessibilityRole="button"
@@ -104,9 +106,11 @@ export function Button({
       disabled={inactive}
       style={({ pressed }) => [
         {
-          minHeight: 50,
-          borderRadius: radius.md,
+          minHeight: 54,
+          borderRadius: radius.pill,
           backgroundColor: bg,
+          borderWidth: kind === 'secondary' ? 1 : 0,
+          borderColor: p.line,
           alignItems: 'center',
           justifyContent: 'center',
           paddingHorizontal: space.lg,
@@ -144,8 +148,8 @@ export function Field({
             borderWidth: 1,
             borderColor: error ? p.danger : p.line,
             borderRadius: radius.md,
-            paddingHorizontal: space.md,
-            minHeight: 50,
+            paddingHorizontal: space.lg,
+            minHeight: 54,
           },
           input.style,
         ]}
@@ -189,14 +193,14 @@ export function ChipGroup<T extends string>({
               accessibilityState={{ selected }}
               onPress={() => onChange(o.value)}
               style={{
-                paddingHorizontal: space.md,
-                paddingVertical: space.sm,
+                paddingHorizontal: space.lg,
+                paddingVertical: 10,
                 borderRadius: radius.pill,
                 borderWidth: 1,
                 borderColor: selected ? p.primary : p.line,
-                backgroundColor: selected ? p.primaryWash : p.surface,
+                backgroundColor: selected ? p.primary : p.surface,
               }}>
-              <Text variant="label" tone={selected ? 'primary' : 'soft'}>
+              <Text variant="label" tone={selected ? 'onPrimary' : 'ink'}>
                 {o.label}
               </Text>
             </Pressable>
@@ -212,7 +216,7 @@ export function Panel({ children, style }: { children: ReactNode; style?: StyleP
   return (
     <View
       style={[
-        { backgroundColor: p.surface, borderRadius: radius.lg, padding: space.lg, gap: space.md, borderWidth: 1, borderColor: p.line },
+        { backgroundColor: p.surface, borderRadius: radius.lg, padding: space.lg + 2, gap: space.md },
         style,
       ]}>
       {children}
@@ -222,9 +226,9 @@ export function Panel({ children, style }: { children: ReactNode; style?: StyleP
 
 export function Notice({ tone = 'due', children }: { tone?: 'due' | 'danger' | 'primary'; children: ReactNode }) {
   const p = usePalette();
-  const bg = tone === 'due' ? p.dueWash : tone === 'danger' ? p.dangerWash : p.primaryWash;
+  const bg = tone === 'due' ? p.dueWash : tone === 'danger' ? p.dangerWash : p.lavenderWash;
   return (
-    <View style={{ backgroundColor: bg, borderRadius: radius.md, padding: space.md }}>
+    <View style={{ backgroundColor: bg, borderRadius: radius.md, padding: space.md + 2 }}>
       <Text variant="caption">{children}</Text>
     </View>
   );
@@ -234,6 +238,120 @@ export function Centered({ children }: { children: ReactNode }) {
   const p = usePalette();
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg, gap: space.md, padding: space.xl }}>
+      {children}
+    </View>
+  );
+}
+
+const AVATAR_TINTS = ['lavender', 'peach', 'line'] as const;
+
+/** Initials in a soft tinted circle; the tint is stable per name. */
+export function Avatar({ name, size = 48 }: { name: string; size?: number }) {
+  const p = usePalette();
+  const initials = name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('') || '?';
+  const tint = AVATAR_TINTS[[...name].reduce((n, c) => n + c.charCodeAt(0), 0) % AVATAR_TINTS.length];
+  const bg = tint === 'lavender' ? p.lavenderWash : tint === 'peach' ? p.peachWash : p.surfaceSunk;
+  const fg = tint === 'lavender' ? p.lavenderDeep : tint === 'peach' ? p.peachDeep : p.inkSoft;
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no"
+      style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
+      <RNText style={[type.label, { color: fg, fontSize: size * 0.36 }]}>{initials}</RNText>
+    </View>
+  );
+}
+
+/** The round dark "go" button that sits in the corner of hero cards. */
+export function ArrowButton({ onPress, label, light = false }: { onPress: () => void; label: string; light?: boolean }) {
+  const p = usePalette();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      hitSlop={8}
+      style={({ pressed }) => ({
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: light ? p.surface : p.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: pressed ? 0.85 : 1,
+      })}>
+      <Feather name="arrow-right" size={22} color={light ? p.ink : p.primaryInk} />
+    </Pressable>
+  );
+}
+
+/** A small rounded square holding an icon, used in the corner of stat cards. */
+export function IconTile({ name, bg, color }: { name: ComponentProps<typeof Feather>['name']; bg: string; color: string }) {
+  return (
+    <View style={{ width: 40, height: 40, borderRadius: radius.sm + 2, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
+      <Feather name={name} size={18} color={color} />
+    </View>
+  );
+}
+
+type HeroTint = 'lavender' | 'peach' | 'dark';
+
+/**
+ * The big coloured card at the top of every screen: optional back button,
+ * a large title, a line of context, and a soft icon blob in the corner.
+ */
+export function HeroCard({
+  tint,
+  icon,
+  title,
+  eyebrow,
+  subtitle,
+  back = false,
+  children,
+}: {
+  tint: HeroTint;
+  icon: ComponentProps<typeof Feather>['name'];
+  title: string;
+  eyebrow?: string;
+  subtitle?: string;
+  back?: boolean;
+  children?: ReactNode;
+}) {
+  const p = usePalette();
+  const bg = tint === 'lavender' ? p.lavender : tint === 'peach' ? p.peach : p.bar;
+  const fg = tint === 'dark' ? p.onBar : p.onTint;
+  const blob = tint === 'lavender' ? p.lavenderWash : tint === 'peach' ? p.peachWash : p.barActive;
+  const blobIcon = tint === 'lavender' ? p.lavenderDeep : tint === 'peach' ? p.peachDeep : p.peach;
+  return (
+    <View style={{ backgroundColor: bg, borderRadius: 34, padding: space.xl, gap: space.md, overflow: 'hidden' }}>
+      <View
+        style={{
+          position: 'absolute',
+          right: -30,
+          top: -24,
+          width: 170,
+          height: 170,
+          borderRadius: 85,
+          backgroundColor: blob,
+          opacity: tint === 'dark' ? 0.8 : 0.4,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <Feather name={icon} size={66} color={blobIcon} />
+      </View>
+      {back ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          hitSlop={8}
+          onPress={() => router.back()}
+          style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: fg, alignItems: 'center', justifyContent: 'center' }}>
+          <Feather name="chevron-left" size={22} color={fg} />
+        </Pressable>
+      ) : null}
+      {eyebrow ? <RNText style={[type.label, { color: fg }]}>{eyebrow}</RNText> : null}
+      <RNText style={[type.display, { color: fg, fontSize: 36, lineHeight: 40, maxWidth: '78%' }]}>{title}</RNText>
+      {subtitle ? <RNText style={[type.body, { color: fg }]}>{subtitle}</RNText> : null}
       {children}
     </View>
   );

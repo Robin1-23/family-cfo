@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { Button, ChipGroup, Field, Panel, Screen, Text } from '@/components/ui';
+import { Button, ChipGroup, Field, HeroCard, Panel, Screen, Text } from '@/components/ui';
 import { RELATION_LABELS } from '@/lib/catalog';
 import type { Language, Relation } from '@/lib/types';
 import { useAuth } from '@/providers/auth-provider';
@@ -62,12 +62,12 @@ export default function OnboardingScreen() {
 
   return (
     <Screen footer={<Button label="Create my family" onPress={submit} loading={busy} />}>
-      <View style={{ gap: space.sm, marginTop: space.lg }}>
-        <Text variant="title">Set up your family</Text>
-        <Text tone="soft">
-          Add the people whose money and cover you look after. You can add more later.
-        </Text>
-      </View>
+      <HeroCard
+        tint="lavender"
+        icon="users"
+        title="Set up your family"
+        subtitle="Add the people whose money and cover you look after. You can add more later."
+      />
 
       <Field label="Your name" value={ownerName} onChangeText={setOwnerName} placeholder="Priya Sharma" autoComplete="name" />
       <Field
@@ -123,9 +123,10 @@ export default function OnboardingScreen() {
                 borderRadius: 999,
                 borderWidth: 1,
                 borderStyle: 'dashed',
-                borderColor: p.primary,
+                borderColor: p.peach,
+                backgroundColor: p.peachWash,
               }}>
-              <Text variant="label" tone="primary">
+              <Text variant="label">
                 + {RELATION_LABELS[rel]}
               </Text>
             </Pressable>

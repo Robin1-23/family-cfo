@@ -11,7 +11,7 @@ import {
   writeBatch,
 } from '@react-native-firebase/firestore';
 
-import type { Household, Language, Member, Relation, Role, UserProfile } from '@/lib/types';
+import type { HealthCheck, Household, Language, Member, Relation, Role, UserProfile } from '@/lib/types';
 import { db } from './firebase';
 
 type Unsubscribe = () => void;
@@ -110,6 +110,15 @@ export async function updateMember(
   patch: Partial<Pick<Member, 'name' | 'relation' | 'language' | 'birthYear' | 'city'>>,
 ): Promise<void> {
   await updateDoc(doc(db, 'households', householdId, 'members', memberId), patch);
+}
+
+/** Saves the onboarding health-check answers for several members at once. */
+export async function saveHealthChecks(householdId: string, checks: { memberId: string; check: HealthCheck }[]): Promise<void> {
+  const batch = writeBatch(db);
+  for (const { memberId, check } of checks) {
+    batch.update(doc(db, 'households', householdId, 'members', memberId), { healthCheck: check });
+  }
+  await batch.commit();
 }
 
 export function subscribeHousehold(

@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Family CFO — Firestore security rules (Foundation sprint).
+// Family CFO — Firestore security rules.
 // Every household document carries a `roles` map (uid -> 'owner' | 'co_manager' | 'viewer');
 // all access to a household and its subcollections is decided from that map.
 
@@ -79,12 +79,28 @@ service cloud.firestore {
 
         function validMember(d) {
           return d.keys().hasOnly(['name', 'relation', 'uid', 'role', 'language', 'consentStatus',
-                                   'birthYear', 'city', 'createdAt'])
+                                   'birthYear', 'city', 'healthCheck', 'createdAt'])
             && isShortString(d.name, 60)
             && d.relation in ['self', 'mother', 'father', 'spouse', 'sibling', 'child', 'grandparent', 'other']
             && d.language in ['en', 'hi']
             && (d.birthYear == null || (d.birthYear is number && math.floor(d.birthYear) == d.birthYear && d.birthYear >= 1900 && d.birthYear <= 2100))
-            && (d.city == null || isShortString(d.city, 60));
+            && (d.city == null || isShortString(d.city, 60))
+            && (!('healthCheck' in d) || validHealthCheck(d.healthCheck));
+        }
+
+        // Self-reported onboarding answers. Mirrors completeCheck() in src/lib/health-check.ts.
+        function validHealthCheck(h) {
+          let ynu = ['yes', 'no', 'unsure'];
+          return h is map
+            && h.keys().hasOnly(['healthCover', 'healthCoverBand', 'loans', 'termCover', 'fixedDeposits', 'papersWith'])
+            && h.healthCover in ynu
+            && (h.healthCover == 'yes'
+                  ? h.healthCoverBand in ['under_3l', '3l_5l', '5l_10l', '10l_plus', 'unsure']
+                  : h.healthCoverBand == null)
+            && h.loans in ynu
+            && (h.loans == 'yes' ? h.termCover in ynu : h.termCover == null)
+            && h.fixedDeposits in ynu
+            && h.papersWith in ['family', 'one_person', 'nobody'];
         }
 
         allow read: if signedIn() && roleBefore(hid) != null;
@@ -110,7 +126,7 @@ service cloud.firestore {
         allow update: if signedIn()
           && roleBefore(hid) in ['owner', 'co_manager']
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['name', 'relation', 'language', 'birthYear', 'city'])
+               .hasOnly(['name', 'relation', 'language', 'birthYear', 'city', 'healthCheck'])
           && validMember(request.resource.data)
           && (resource.data.relation == 'self') == (request.resource.data.relation == 'self');
 
@@ -150,6 +166,54 @@ service cloud.firestore {
           && roleBefore(hid) in ['owner', 'co_manager']
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'docType'])
           && isShortString(request.resource.data.title, 120);
+
+        allow delete: if signedIn() && roleBefore(hid) in ['owner', 'co_manager'];
+      }
+
+      // ------------------------------------------------------------ items
+      // Confirmed policies, deposits and loans. Mirrors buildItem() in src/lib/items.ts.
+      match /items/{iid} {
+
+        function optText(v, maxLen) {
+          return v == null || isShortString(v, maxLen);
+        }
+        function optRupees(v) {
+          return v == null || (v is int && v >= 0 && v <= 1000000000000);
+        }
+        function optDate(v) {
+          return v == null || (v is string && v.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'));
+        }
+
+        function validItem(d) {
+          return d.keys().hasOnly(['type', 'memberId', 'provider', 'numberLast4', 'amount', 'premium', 'dueDate',
+                                   'maturityDate', 'nominee', 'sourceDocId', 'confirmedBy', 'createdAt'])
+            && d.type in ['health_policy', 'term_policy', 'life_policy', 'critical_illness_policy', 'accident_policy',
+                          'vehicle_policy', 'fixed_deposit', 'loan', 'other']
+            && exists(/databases/$(database)/documents/households/$(hid)/members/$(d.memberId))
+            && optText(d.provider, 80)
+            // Never a full policy or account number.
+            && (d.numberLast4 == null || (d.numberLast4 is string && d.numberLast4.matches('^[A-Z0-9]{1,4}$')))
+            && optRupees(d.amount)
+            && optRupees(d.premium)
+            && optDate(d.dueDate)
+            && optDate(d.maturityDate)
+            && optText(d.nominee, 60)
+            && d.confirmedBy == me();
+        }
+
+        allow read: if signedIn() && roleBefore(hid) != null;
+
+        allow create: if signedIn()
+          && roleBefore(hid) in ['owner', 'co_manager']
+          && validItem(request.resource.data)
+          && (request.resource.data.sourceDocId == null
+              || get(/databases/$(database)/documents/households/$(hid)/documents/$(request.resource.data.sourceDocId))
+                   .data.memberId == request.resource.data.memberId);
+
+        allow update: if signedIn()
+          && roleBefore(hid) in ['owner', 'co_manager']
+          && validItem(request.resource.data)
+          && request.resource.data.sourceDocId == resource.data.sourceDocId;
 
         allow delete: if signedIn() && roleBefore(hid) in ['owner', 'co_manager'];
       }

@@ -5,8 +5,13 @@
  * households/{householdId}                 -> Household
  * households/{householdId}/members/{id}    -> Member
  * households/{householdId}/documents/{id}  -> VaultDocument
+ * households/{householdId}/items/{id}      -> Item
  * households/{householdId}/consents/{id}   -> ConsentRecord
  */
+
+import type { ExtractedFields, ItemType } from '../../functions/src/extraction';
+
+export type { ExtractedFields, FieldKey, ItemType } from '../../functions/src/extraction';
 
 export type Role = 'owner' | 'co_manager' | 'viewer';
 
@@ -72,7 +77,22 @@ export interface Member {
   consentStatus: ConsentStatus;
   birthYear: number | null;
   city: string | null;
+  /** Self-reported answers from the onboarding health check (src/lib/health-check.ts). */
+  healthCheck?: HealthCheck;
   createdAt?: TimestampLike;
+}
+
+export type YesNoUnsure = 'yes' | 'no' | 'unsure';
+
+export interface HealthCheck {
+  healthCover: YesNoUnsure;
+  /** Only when healthCover is "yes". */
+  healthCoverBand: 'under_3l' | '3l_5l' | '5l_10l' | '10l_plus' | 'unsure' | null;
+  loans: YesNoUnsure;
+  /** Only when loans is "yes". */
+  termCover: YesNoUnsure | null;
+  fixedDeposits: YesNoUnsure;
+  papersWith: 'family' | 'one_person' | 'nobody';
 }
 
 export interface VaultDocument {
@@ -86,6 +106,30 @@ export interface VaultDocument {
   sizeBytes: number;
   ocrStatus: OcrStatus;
   uploadedBy: string;
+  /** Written by the extractDocument Cloud Function; shown for confirmation, never trusted as-is. */
+  extractedFields?: ExtractedFields;
+  ocrError?: string;
+  createdAt?: TimestampLike;
+}
+
+/** A confirmed policy, deposit or loan: the single table every screen reads. */
+export interface Item {
+  id: string;
+  type: ItemType;
+  memberId: string;
+  provider: string | null;
+  /** Last 4 characters of the policy/account number only. */
+  numberLast4: string | null;
+  /** Sum assured, FD principal or loan amount, whole rupees. */
+  amount: number | null;
+  premium: number | null;
+  /** YYYY-MM-DD */
+  dueDate: string | null;
+  maturityDate: string | null;
+  nominee: string | null;
+  /** The vault document it was confirmed from, or null for manual entry. */
+  sourceDocId: string | null;
+  confirmedBy: string;
   createdAt?: TimestampLike;
 }
 

@@ -192,10 +192,10 @@ Fields marked ✅ exist in code today (see `src/lib/types.ts`); the rest are pla
 | --- | --- | --- |
 | users/{uid} ✅ | phone, activeHouseholdId | Created on first sign-in |
 | households/{id} ✅ | name, ownerUid, plan, **roles {uid: role}**, createdAt | `roles` drives every security rule |
-| …/members/{memberId} ✅ | name, relation, uid, role, language, consentStatus, birthYear, city | Non-self members start as `viewer` + `pending` |
+| …/members/{memberId} ✅ | name, relation, uid, role, language, consentStatus, birthYear, city, healthCheck {healthCover, healthCoverBand, loans, termCover, fixedDeposits, papersWith} | Non-self members start as `viewer` + `pending` |
 | …/documents/{docId} ✅ | memberId, docType, title, fileName, storagePath, contentType, sizeBytes, ocrStatus, uploadedBy | `ocrStatus` starts `pending`; only Functions advance it |
-| …/documents/{docId}.extractedFields | insurer, policyNumber (masked), sumAssured, premium, dueDate, nominee, confidence | Sprint 2 |
-| …/items/{itemId} | type, memberId, provider, maskedNumber, amount, dueDate, maturityDate, nominee, sourceDocId, confidence, confirmedBy | The single table every screen reads; Sprint 2 |
+| …/documents/{docId}.extractedFields ✅ | itemType, provider, numberLast4, amount, premium, dueDate, maturityDate, nominee, confidence {field: 0–1}; plus ocrError | Written only by the `extractDocument` Function (Claude, structured output); full numbers never stored |
+| …/items/{itemId} ✅ | type, memberId, provider, numberLast4, amount, premium, dueDate, maturityDate (YYYY-MM-DD), nominee, sourceDocId, confirmedBy | The single table every screen reads. Created only after the user confirms (or enters by hand); `onItemCreated` then marks the source document `confirmed` |
 | …/alerts/{alertId} | itemId, kind, dueAt, ownerMemberId, channel, status | Alert engine; Sprint 2 |
 | …/consents/{consentId} ✅ (read-only to clients) | memberId, source, purpose, scope, grantedAt, expiresAt, revokedAt | Modelled on the ReBIT AA artefact |
 | …/ledger/{entryId} | payerMemberId, itemId, amount, date | Sibling cost-split; V2 |
@@ -253,7 +253,8 @@ V3 (months 10+)   Expert desk, insurance repositories, Bima Sugam, succession ki
 | Sprint | Scope | Status |
 | --- | --- | --- |
 | 1 · Foundation | Phone OTP, onboarding, households/members, roles + rules, vault upload, dashboard, member profile, WhatsApp invite, settings | ✅ Shipped (commit b627e09) |
-| 2 · Core value | OCR extraction Function + confirm screen, items collection, Coverage Radar, alert engine + WhatsApp, Emergency Mode, Hindi parent view, parent invite/consent flow | Next |
+| 2 · Core value | OCR extraction Function + confirm screen, items collection, Welcome screen, quick health check → first Coverage Score | ✅ Built, not yet deployed |
+| 2 · Core value (cont.) | Coverage Radar, alert engine + WhatsApp, Emergency Mode, Hindi parent view, parent invite/consent flow | Next |
 | 3 · Beta | Subscriptions (Play Billing/Razorpay), Free-tier limits, analytics, security review, marketing site | Planned |
 
 ## Sources

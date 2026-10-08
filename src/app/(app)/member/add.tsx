@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 
-import { Button, ChipGroup, Field, Screen, Text } from '@/components/ui';
+import { Button, ChipGroup, Field, HeroCard, Screen, Text } from '@/components/ui';
 import { RELATION_LABELS, RELATION_ORDER } from '@/lib/catalog';
 import type { Language, Relation } from '@/lib/types';
 import { useHousehold } from '@/providers/household-provider';
@@ -42,7 +42,14 @@ export default function AddMemberScreen() {
   }
 
   return (
-    <Screen edges={['bottom']} footer={<Button label="Add to family" onPress={save} loading={busy} />}>
+    <Screen footer={<Button label="Add to family" onPress={save} loading={busy} />}>
+      <HeroCard
+        tint="peach"
+        icon="user-plus"
+        back
+        title="Add family member"
+        subtitle="Their bank and investment details are only connected once they approve it themselves."
+      />
       <Field label="Name" value={name} onChangeText={setName} placeholder="Sunita Sharma" autoFocus />
       <ChipGroup<Relation>
         label="Relation to you"
