@@ -1,20 +1,17 @@
+import { REGION, anthropicKey, db } from './admin';
+
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
-import { initializeApp } from 'firebase-admin/app';
-import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { logger } from 'firebase-functions';
-import { defineSecret } from 'firebase-functions/params';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { z } from 'zod';
 
 import { ITEM_TYPES, normalizeExtraction } from './extraction';
 
-initializeApp();
-const db = getFirestore();
-const anthropicKey = defineSecret('ANTHROPIC_API_KEY');
-
-const REGION = 'asia-south1';
+export { api } from './api';
+export { dailyReminders } from './sweep';
 // Insurance doc types worth reading; ID copies, property papers etc. are stored only.
 const EXTRACTABLE = new Set([
   'health_policy', 'term_policy', 'life_policy', 'vehicle_policy', 'fixed_deposit', 'loan', 'mutual_fund', 'other',
@@ -31,13 +28,14 @@ const RawSchema = z.object({
   dueDate: z.string().nullable().describe('Next premium due date or policy renewal/expiry date, as printed'),
   maturityDate: z.string().nullable(),
   nominee: z.string().nullable(),
+  helpline: z.string().nullable().describe('Insurer or TPA customer care / claims helpline number'),
   confidence: z.object({
     itemType: conf, provider: conf, policyOrAccountNumber: conf, amount: conf,
-    premium: conf, dueDate: conf, maturityDate: conf, nominee: conf,
+    premium: conf, dueDate: conf, maturityDate: conf, nominee: conf, helpline: conf,
   }),
 });
 
-const PROMPT = `This is an Indian financial document (insurance policy, FD receipt, LIC bond or loan letter).
+const PROMPT = `This is an Indian financial document (insurance policy, FD receipt, LIC bond, loan letter or statement).
 Extract only what is printed on it. Use null for anything not present or not legible; never guess.
 Dates: copy them as printed (Indian documents are usually DD/MM/YYYY).
 Amounts: copy them as printed, including "lakh" or "crore" if used.
@@ -54,7 +52,7 @@ export const extractDocument = onDocumentCreated(
 
     const isPdf = d.contentType === 'application/pdf';
     if (!isPdf && !IMAGE_TYPES.has(d.contentType)) {
-      await snap.ref.update({ ocrStatus: 'failed', ocrError: 'This photo format can’t be read automatically. Enter the details yourself.' });
+      await snap.ref.update({ ocrStatus: 'failed', ocrError: 'We can’t read this photo format.' });
       return;
     }
 
@@ -82,7 +80,7 @@ export const extractDocument = onDocumentCreated(
     } catch (e) {
       // Log the reason, never the document contents.
       logger.error('extractDocument failed', { path: snap.ref.path, error: (e as Error).message });
-      await snap.ref.update({ ocrStatus: 'failed', ocrError: 'We couldn’t read this document. Enter the details yourself.' });
+      await snap.ref.update({ ocrStatus: 'failed', ocrError: 'We couldn’t read this document.' });
     }
   },
 );

@@ -1,8 +1,9 @@
+import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { Avatar, Button, HeroCard, Notice, Panel, Screen, Text } from '@/components/ui';
+import { Avatar, BackButton, Button, HeroCard, Notice, Panel, ScoreRing, Screen, Text } from '@/components/ui';
 import { checkTargets, completeCheck, memberCoverageScore, questionsFor } from '@/lib/health-check';
 import type { HealthCheck } from '@/lib/types';
 import { useHousehold } from '@/providers/household-provider';
@@ -77,14 +78,29 @@ export default function HealthCheckScreen() {
     const family = Math.round(results.reduce((a, r) => a + r.score, 0) / results.length);
     return (
       <>
-        <Screen footer={<Button label="Go to my family" onPress={() => router.back()} />}>
-          <HeroCard
-            tint="lavender"
-            icon="award"
-            eyebrow="Your first Coverage Score"
-            title={`${family} / 100`}
-            subtitle="Based on your answers. It gets more accurate as you add policies to the vault."
-          />
+        <Screen
+          footer={
+            <View style={{ gap: space.sm }}>
+              <Button
+                label="Add your first policy"
+                icon="camera"
+                onPress={() => router.replace({ pathname: '/upload', params: { memberId: targets[0].id, docType: 'health_policy' } })}
+              />
+              <Button label="Go to my family" kind="quiet" onPress={() => router.back()} />
+            </View>
+          }>
+          <HeroCard tint="lime" icon="award" eyebrow="Your first Coverage Score" title={family >= 70 ? 'Well covered' : 'Room to improve'} subtitle="Sharpens as you add policies.">
+            <View style={{ alignItems: 'center', paddingVertical: space.md }}>
+              <ScoreRing value={family} size={150} stroke={12} color={p.bar} track={p.limeLo}>
+                <Text variant="display" style={[type.number, { color: p.onTint, fontSize: 46, lineHeight: 50, letterSpacing: -2 }]}>
+                  {family}
+                </Text>
+                <Text variant="caption" style={{ color: p.onTint, opacity: 0.6, fontWeight: '600' }}>
+                  of 100
+                </Text>
+              </ScoreRing>
+            </View>
+          </HeroCard>
           {results.map(({ m, score, gaps }) => (
             <Panel key={m.id}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
@@ -98,7 +114,7 @@ export default function HealthCheckScreen() {
                     paddingHorizontal: space.md,
                     paddingVertical: space.sm,
                     borderRadius: radius.pill,
-                    backgroundColor: score >= 70 ? p.lavenderWash : p.peachWash,
+                    backgroundColor: score >= 70 ? p.limeWash : p.amberWash,
                     alignItems: 'center',
                   }}>
                   <Text variant="heading" style={type.number}>
@@ -110,14 +126,17 @@ export default function HealthCheckScreen() {
                 <Text tone="soft">No gaps from these answers.</Text>
               ) : (
                 gaps.map((g) => (
-                  <Text key={g} tone="soft">
-                    • {g}
-                  </Text>
+                  <View key={g} style={{ flexDirection: 'row', gap: space.sm }}>
+                    <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: p.amber, marginTop: 7 }} />
+                    <Text variant="caption" tone="soft" style={{ flex: 1, fontSize: 13, lineHeight: 19 }}>
+                      {g}
+                    </Text>
+                  </View>
                 ))
               )}
             </Panel>
           ))}
-          <Notice tone="primary">This is general information, not advice. We never recommend or sell a policy.</Notice>
+          <Notice tone="primary">General information, not advice. We never sell policies.</Notice>
         </Screen>
       </>
     );
@@ -128,21 +147,29 @@ export default function HealthCheckScreen() {
 
   return (
     <>
-      <Screen footer={<Button label="Back" kind="secondary" onPress={back} disabled={saving} />}>
-        <HeroCard tint="peach" icon="activity" title="Quick health check" />
-        <View style={{ gap: space.sm }}>
-          <Text variant="caption" tone="faint">
-            Question {position} of {total}
-            {targets.length > 1 ? ` · about ${member.name.split(' ')[0]}` : ''}
-          </Text>
-          <View style={{ height: 6, borderRadius: radius.pill, backgroundColor: p.surfaceSunk }}>
-            <View
-              style={{ height: 6, borderRadius: radius.pill, backgroundColor: p.lavender, width: `${(position / total) * 100}%` }}
-            />
+      <Screen
+        footer={
+          position > 1 ? <Button label="Previous question" kind="quiet" icon="arrow-left" onPress={back} disabled={saving} /> : undefined
+        }>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+          <BackButton />
+          <View style={{ flex: 1, height: 6, borderRadius: radius.pill, backgroundColor: p.surfaceSunk }}>
+            <View style={{ height: 6, borderRadius: radius.pill, backgroundColor: p.lime, width: `${(position / total) * 100}%` }} />
           </View>
+          <Text variant="label" tone="soft" style={type.number}>
+            {position}/{total}
+          </Text>
         </View>
 
-        <Text variant="title">{question.text(name)}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.lg }}>
+          <Avatar name={member.name} size={28} />
+          <Text variant="overline" tone="soft">
+            {member.relation === 'self' ? 'About you' : `About ${member.name.split(' ')[0]}`}
+          </Text>
+        </View>
+        <Text variant="title" style={{ fontSize: 22, lineHeight: 28 }}>
+          {question.text(name)}
+        </Text>
 
         <View style={{ gap: space.sm }}>
           {question.options.map((o) => {
@@ -155,18 +182,22 @@ export default function HealthCheckScreen() {
                 disabled={saving}
                 onPress={() => answer(o.value)}
                 style={({ pressed }) => ({
-                  minHeight: 58,
-                  justifyContent: 'center',
+                  minHeight: 52,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
                   paddingHorizontal: space.lg,
-                  borderRadius: radius.pill,
+                  borderRadius: radius.lg,
+                  boxShadow: selected ? undefined : p.shadow,
                   borderWidth: 1,
                   borderColor: selected ? p.primary : p.line,
                   backgroundColor: selected ? p.primary : p.surface,
                   opacity: pressed ? 0.8 : 1,
                 })}>
-                <Text variant="label" tone={selected ? 'onPrimary' : 'ink'} style={{ fontSize: 16 }}>
+                <Text variant="label" tone={selected ? 'onPrimary' : 'ink'} style={{ fontSize: 14, fontWeight: '500' }}>
                   {o.label}
                 </Text>
+                <Feather name={selected ? 'check-circle' : 'circle'} size={16} color={selected ? p.lime : p.line} />
               </Pressable>
             );
           })}

@@ -1,10 +1,13 @@
 import { Feather } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Linking, Pressable, Text as RNText, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, ActivityIndicator, Linking, Pressable, View } from 'react-native';
 
 import { DocumentRow } from '@/components/document-row';
 import { ConsentBadge } from '@/components/member-row';
-import { Avatar, Button, Centered, IconTile, Panel, Screen, Text } from '@/components/ui';
+import { success } from '@/components/haptics';
+import { useToast } from '@/components/toast';
+import { Amount, Avatar, BackButton, Button, Centered, GradientFill, IconTile, Screen, SectionHeader, Text, memberStatus, pressFeedback } from '@/components/ui';
 import { DOC_TYPE_LABELS, ESSENTIAL_DOC_TYPES, RELATION_LABELS } from '@/lib/catalog';
 import { APP_DOWNLOAD_URL } from '@/lib/config';
 import { ITEM_TYPE_LABELS, formatCompactRupees, formatDate, formatRupees } from '@/lib/items';
@@ -12,6 +15,7 @@ import { canEdit } from '@/lib/permissions';
 import { memberReadiness } from '@/lib/readiness';
 import type { ItemType } from '@/lib/types';
 import { useHousehold } from '@/providers/household-provider';
+import { callApi } from '@/services/api';
 import { radius, space, type, usePalette } from '@/theme/tokens';
 
 const COVER_TYPES = new Set<ItemType>(['health_policy', 'term_policy', 'life_policy', 'critical_illness_policy', 'accident_policy']);
@@ -22,6 +26,8 @@ export default function MemberScreen() {
   const { members, documents, items, role, household } = useHousehold();
   const p = usePalette();
   const member = members.find((m) => m.id === id);
+  const [inviting, setInviting] = useState(false);
+  const toast = useToast();
 
   if (!member) {
     return (
@@ -40,65 +46,89 @@ export default function MemberScreen() {
   const isSelf = member.relation === 'self';
   const firstName = isSelf ? 'you' : member.name.split(' ')[0];
 
-  function inviteOnWhatsApp() {
-    const text =
-      member!.language === 'hi'
-        ? `नमस्ते! मैंने ${household?.name ?? 'हमारे परिवार'} के लिए Family CFO पर आपकी पॉलिसी और ज़रूरी कागज़ एक जगह रखना शुरू किया है। आपकी अनुमति से ही आपकी जानकारी जुड़ेगी। ऐप यहाँ से डाउनलोड करें: ${APP_DOWNLOAD_URL}`
-        : `Hi! I've started keeping our family's policies and papers in one place on Family CFO (${household?.name ?? 'our family'}). Your details are only added with your permission. Get the app: ${APP_DOWNLOAD_URL}`;
-    Linking.openURL(`https://wa.me/?text=${encodeURIComponent(text)}`);
+  /** Creates a one-time code tied to their number, then opens WhatsApp to them with it. */
+  async function inviteOnWhatsApp() {
+    if (!member!.phone) {
+      Alert.alert('Add their number first', 'The invite only works for their own phone, so nobody else can accept it.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Add number', onPress: () => router.push({ pathname: '/member/add', params: { id: member!.id } }) },
+      ]);
+      return;
+    }
+    setInviting(true);
+    try {
+      const { code } = await callApi<{ code: string }>('/invite/create', { householdId: household?.id, memberId: member!.id });
+      const link = `familycfo://join/${code}`;
+      const text =
+        member!.language === 'hi'
+          ? `नमस्ते! मैंने Family CFO पर ${household?.name ?? 'हमारे परिवार'} के लिए आपकी पॉलिसी और ज़रूरी कागज़ एक जगह रखे हैं। आपकी अनुमति से ही आपकी जानकारी दिखेगी।\n\n1. ऐप डाउनलोड करें: ${APP_DOWNLOAD_URL}\n2. अपने नंबर से साइन इन करें\n3. यह कोड डालें: ${code}\n\n(या यहाँ दबाएँ: ${link})`
+          : `Hi! I've put our family's policies and papers in one place on Family CFO (${household?.name ?? 'our family'}). Your details are only shown with your permission.\n\n1. Get the app: ${APP_DOWNLOAD_URL}\n2. Sign in with your number\n3. Enter this code: ${code}\n\n(or tap: ${link})`;
+      await Linking.openURL(`https://wa.me/${member!.phone.replace('+', '')}?text=${encodeURIComponent(text)}`);
+      success();
+      toast({ message: `Invite code ${code} ready to send` });
+    } catch (e) {
+      Alert.alert('Couldn’t create the invite', (e as Error).message);
+    } finally {
+      setInviting(false);
+    }
   }
 
   return (
     <Screen>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => router.back()}
-          style={{
-            width: 52,
-            height: 52,
-            borderRadius: 26,
-            borderWidth: 1,
-            borderColor: p.line,
-            backgroundColor: p.surface,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-          <Feather name="chevron-left" size={22} color={p.ink} />
-        </Pressable>
-        <Avatar name={member.name} size={52} />
+        <BackButton />
+        <Avatar name={member.name} size={42} status={memberStatus(member)} />
         <View style={{ flex: 1 }}>
           <Text variant="heading" numberOfLines={1}>
             {member.name}
           </Text>
-          <Text variant="caption" tone="soft" numberOfLines={1}>
+          <Text variant="caption" tone="faint" numberOfLines={1}>
             {RELATION_LABELS[member.relation]}
             {member.city ? ` · ${member.city}` : ''}
           </Text>
         </View>
         <ConsentBadge member={member} />
+        {editable ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Edit ${member.name}`}
+            onPress={() => router.push({ pathname: '/member/add', params: { id: member.id } })}
+            hitSlop={8}
+            style={({ pressed }) => ({
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: p.line,
+              backgroundColor: p.surface,
+              alignItems: 'center',
+              justifyContent: 'center',
+              ...pressFeedback(pressed),
+            })}>
+            <Feather name="edit-2" size={15} color={p.ink} />
+          </Pressable>
+        ) : null}
       </View>
 
       <View
         style={{
-          backgroundColor: p.peachWash,
-          borderWidth: 1.5,
-          borderColor: p.peach,
-          borderRadius: 32,
-          padding: space.lg + 2,
+          backgroundColor: p.lime,
+          borderRadius: radius.xl,
+          padding: space.lg,
           gap: space.lg,
+          overflow: 'hidden',
         }}>
+        <GradientFill tint="lime" />
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <IconTile name="bar-chart-2" bg={p.bar} color={p.onBar} />
-          <Text variant="caption" style={{ color: p.onTint }}>
+          <IconTile name="bar-chart-2" bg={p.bar} color={p.lime} size={32} />
+          <Text variant="overline" style={{ color: p.onTint, opacity: 0.7 }}>
             {readiness.present.length} of {ESSENTIAL_DOC_TYPES.length} essentials in the vault
           </Text>
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Stat value={String(ownItems.length)} label={ownItems.length === 1 ? 'policy' : 'policies'} />
-          <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: p.peach, marginHorizontal: space.lg }} />
+          <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: p.onTint, opacity: 0.2, marginHorizontal: space.lg }} />
           <Stat value={cover > 0 ? formatCompactRupees(cover) : '—'} label="cover" />
         </View>
 
@@ -107,22 +137,22 @@ export default function MemberScreen() {
             const ok = readiness.present.includes(t);
             return (
               <View key={t} style={{ alignItems: 'center', gap: space.sm }}>
-                <View style={{ width: 56, height: 120, justifyContent: 'flex-end' }}>
+                <View style={{ width: 44, height: 92, justifyContent: 'flex-end' }}>
                   <View
                     style={{
-                      height: ok ? 120 : 52,
+                      height: ok ? 92 : 40,
                       borderRadius: radius.pill,
-                      backgroundColor: ok ? p.peachDeep : 'transparent',
+                      backgroundColor: ok ? p.bar : 'transparent',
                       borderWidth: ok ? 0 : 1.5,
                       borderStyle: 'dashed',
-                      borderColor: p.peachDeep,
+                      borderColor: p.bar,
                       alignItems: 'center',
-                      paddingTop: space.md,
+                      paddingTop: 10,
                     }}>
-                    <Feather name={ok ? 'check' : 'plus'} size={18} color={ok ? p.onBar : p.peachDeep} />
+                    <Feather name={ok ? 'check' : 'plus'} size={15} color={ok ? p.lime : p.bar} />
                   </View>
                 </View>
-                <Text variant="caption" style={{ color: p.onTint }}>
+                <Text variant="caption" style={{ color: p.onTint, fontWeight: '600' }}>
                   {SHORT[t]}
                 </Text>
               </View>
@@ -132,6 +162,8 @@ export default function MemberScreen() {
 
         {editable && readiness.missing.length > 0 ? (
           <Button
+            kind="dark"
+            icon="plus"
             label={`Add ${firstName === 'you' ? 'your' : `${firstName}’s`} ${DOC_TYPE_LABELS[readiness.missing[0]].toLowerCase()}`}
             onPress={() => router.push({ pathname: '/upload', params: { memberId: member.id, docType: readiness.missing[0] } })}
           />
@@ -149,38 +181,83 @@ export default function MemberScreen() {
             padding: space.sm,
             paddingRight: space.md,
           }}>
-          <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: p.peach, alignItems: 'center', justifyContent: 'center' }}>
-            <Feather name="message-circle" size={20} color={p.onTint} />
+          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: p.amber, alignItems: 'center', justifyContent: 'center' }}>
+            <Feather name="message-circle" size={17} color={p.onTint} />
           </View>
           <View style={{ flex: 1 }}>
             <Text variant="label">{member.name.split(' ')[0]} hasn’t joined yet</Text>
-            <Text variant="caption" tone="soft">
-              Bank details connect only after they approve.
+            <Text variant="caption" tone="faint" numberOfLines={1}>
+              Invite them to approve their details
             </Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            onPress={inviteOnWhatsApp}
-            style={{ backgroundColor: p.primary, borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: space.sm }}>
-            <Text variant="label" tone="onPrimary">
-              Invite
-            </Text>
-          </Pressable>
+          {editable ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={inviting}
+              onPress={inviteOnWhatsApp}
+              style={{ backgroundColor: p.primary, borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: space.sm, minWidth: 74, alignItems: 'center' }}>
+              {inviting ? (
+                <ActivityIndicator size="small" color={p.primaryInk} />
+              ) : (
+                <Text variant="label" tone="onPrimary">
+                  Invite
+                </Text>
+              )}
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 
+      <View style={{ flexDirection: 'row', gap: space.sm }}>
+        {!isSelf ? (
+          <Button
+            label="See their view"
+            kind="secondary"
+            icon="eye"
+            style={{ flex: 1 }}
+            onPress={() => router.push({ pathname: '/parent/[id]', params: { id: member.id } })}
+          />
+        ) : null}
+        <Button
+          label="Emergency"
+          kind="secondary"
+          icon="alert-octagon"
+          style={{ flex: 1 }}
+          onPress={() => router.push({ pathname: '/emergency', params: { memberId: member.id } })}
+        />
+      </View>
+
       <View style={{ gap: space.md }}>
-        <Text variant="title">Policies and deposits</Text>
+        <SectionHeader
+          title="Policies and deposits"
+          action={editable ? 'Add by hand' : undefined}
+          onAction={editable ? () => router.push({ pathname: '/item/new', params: { memberId: member.id } }) : undefined}
+        />
         {ownItems.length === 0 ? (
-          <Text tone="soft">Nothing confirmed for {firstName} yet. Add a document, or enter the details by hand.</Text>
+          <Text variant="caption" tone="soft">
+            Nothing confirmed yet. Add a document to get started.
+          </Text>
         ) : (
           ownItems.map((i) => (
-            <Panel key={i.id} style={{ gap: space.sm }}>
+            <Pressable
+              key={i.id}
+              accessibilityRole="button"
+              disabled={!editable}
+              onPress={() => router.push({ pathname: '/item/new', params: { itemId: i.id } })}
+              style={({ pressed }) => ({
+                backgroundColor: p.surface,
+                borderRadius: radius.lg,
+                gap: space.sm,
+                padding: space.md,
+                boxShadow: p.shadow,
+                ...pressFeedback(pressed),
+              })}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
                 <IconTile
+                  size={34}
                   name={COVER_TYPES.has(i.type) ? 'shield' : 'trending-up'}
-                  bg={COVER_TYPES.has(i.type) ? p.lavenderWash : p.peachWash}
-                  color={COVER_TYPES.has(i.type) ? p.lavenderDeep : p.peachDeep}
+                  bg={COVER_TYPES.has(i.type) ? p.limeWash : p.amberWash}
+                  color={COVER_TYPES.has(i.type) ? p.limeDeep : p.amberDeep}
                 />
                 <View style={{ flex: 1 }}>
                   <Text variant="label" numberOfLines={1}>
@@ -192,14 +269,14 @@ export default function MemberScreen() {
                   </Text>
                 </View>
                 {i.amount != null ? (
-                  <Text variant="heading" style={type.number}>
+                  <Text variant="heading" style={[type.number, { fontSize: 15 }]}>
                     {formatCompactRupees(i.amount)}
                   </Text>
                 ) : null}
               </View>
               <Text variant="caption" tone="soft" style={type.number}>
                 {[
-                  i.premium != null && `Premium ${formatRupees(i.premium)}`,
+                  i.premium != null && `${i.type === 'loan' ? 'EMI' : 'Premium'} ${formatRupees(i.premium)}`,
                   i.dueDate && `Due ${formatDate(i.dueDate)}`,
                   i.maturityDate && `Matures ${formatDate(i.maturityDate)}`,
                 ]
@@ -207,29 +284,24 @@ export default function MemberScreen() {
                   .join(' · ') || 'No dates yet'}
               </Text>
               <Text variant="caption" tone={i.nominee ? 'faint' : 'danger'}>
-                {i.nominee ? `Nominee: ${i.nominee}` : 'No nominee recorded'}
+                {i.nominee ? `Nominee: ${i.nominee}` : i.type === 'loan' ? 'Loan' : 'No nominee recorded'}
               </Text>
-            </Panel>
+            </Pressable>
           ))
         )}
-        {editable ? (
-          <Button
-            label="Add details by hand"
-            kind="secondary"
-            onPress={() => router.push({ pathname: '/item/new', params: { memberId: member.id } })}
-          />
-        ) : null}
       </View>
 
       <View style={{ gap: space.md }}>
-        <Text variant="title">Documents</Text>
+        <SectionHeader title="Documents" />
         {own.length === 0 ? (
-          <Text tone="soft">No documents for {firstName} yet.</Text>
+          <Text variant="caption" tone="soft">
+            No documents for {firstName} yet.
+          </Text>
         ) : (
-          own.map((d) => <DocumentRow key={d.id} document={d} editable={editable} />)
+          own.map((d) => <DocumentRow key={d.id} document={d} editable={editable} householdId={household?.id} />)
         )}
         {editable ? (
-          <Button label="Add a document" onPress={() => router.push({ pathname: '/upload', params: { memberId: member.id } })} />
+          <Button label="Add a document" icon="upload" onPress={() => router.push({ pathname: '/upload', params: { memberId: member.id } })} />
         ) : null}
       </View>
     </Screen>
@@ -239,9 +311,11 @@ export default function MemberScreen() {
 function Stat({ value, label }: { value: string; label: string }) {
   const p = usePalette();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space.sm, flex: 1 }}>
-      <RNText style={[type.display, type.number, { color: p.onTint }]}>{value}</RNText>
-      <RNText style={[type.heading, { color: p.onTint, fontWeight: '500' }]}>{label}</RNText>
+    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flex: 1 }}>
+      <Amount value={value} size={26} color={p.onTint} />
+      <Text variant="caption" style={{ color: p.onTint, opacity: 0.75 }}>
+        {label}
+      </Text>
     </View>
   );
 }

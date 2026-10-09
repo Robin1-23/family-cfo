@@ -6,7 +6,7 @@ import type { MemberReadiness } from '@/lib/readiness';
 import type { Member } from '@/lib/types';
 import { radius, space, usePalette } from '@/theme/tokens';
 import { SafetyStrip } from './safety-strip';
-import { Avatar, Text } from './ui';
+import { Avatar, Text, pressFeedback } from './ui';
 
 export function ConsentBadge({ member }: { member: Member }) {
   const p = usePalette();
@@ -18,9 +18,9 @@ export function ConsentBadge({ member }: { member: Member }) {
         backgroundColor: declined ? p.dangerWash : p.dueWash,
         borderRadius: radius.pill,
         paddingHorizontal: space.sm,
-        paddingVertical: 2,
+        paddingVertical: 3,
       }}>
-      <Text variant="caption">{declined ? 'Declined to join' : 'Not joined yet'}</Text>
+      <Text variant="caption" style={{ fontSize: 11, fontWeight: '600' }}>{declined ? 'Declined to join' : 'Not joined yet'}</Text>
     </View>
   );
 }
@@ -34,24 +34,25 @@ export function MemberRow({ member, readiness }: { member: Member; readiness: Me
         style={({ pressed }) => ({
           backgroundColor: p.surface,
           borderRadius: radius.lg,
-          padding: space.lg + 2,
+          padding: space.lg,
           gap: space.md,
-          opacity: pressed ? 0.85 : 1,
+          boxShadow: p.shadow,
+          ...pressFeedback(pressed),
         })}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-          <Avatar name={member.name} size={44} />
+          <Avatar name={member.name} size={40} />
           <View style={{ flex: 1 }}>
-            <Text variant="heading" numberOfLines={1}>
+            <Text variant="label" style={{ fontSize: 14 }} numberOfLines={1}>
               {member.name}
             </Text>
-            <Text variant="caption" tone="soft">
+            <Text variant="caption" tone="faint" numberOfLines={1}>
               {RELATION_LABELS[member.relation]} · {readiness.documentCount}{' '}
               {readiness.documentCount === 1 ? 'document' : 'documents'}
             </Text>
           </View>
           <ConsentBadge member={member} />
         </View>
-        <SafetyStrip present={readiness.present} />
+        <SafetyStrip present={readiness.present} compact />
       </Pressable>
     </Link>
   );

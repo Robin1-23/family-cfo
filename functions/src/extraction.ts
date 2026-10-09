@@ -13,6 +13,13 @@ export const ITEM_TYPES = [
   'accident_policy',
   'vehicle_policy',
   'fixed_deposit',
+  'savings_account',
+  'mutual_fund',
+  'stocks',
+  'epf',
+  'ppf',
+  'gold',
+  'property',
   'loan',
   'other',
 ] as const;
@@ -28,6 +35,7 @@ export const FIELD_KEYS = [
   'dueDate',
   'maturityDate',
   'nominee',
+  'helpline',
 ] as const;
 
 export type FieldKey = (typeof FIELD_KEYS)[number];
@@ -45,6 +53,8 @@ export interface ExtractedFields {
   dueDate: string | null;
   maturityDate: string | null;
   nominee: string | null;
+  /** Insurer or TPA helpline as printed, e.g. "1800 425 2255". */
+  helpline: string | null;
   /** 0–1 per field; the confirm screen asks the user to check low ones. */
   confidence: Partial<Record<FieldKey, number>>;
 }
@@ -59,6 +69,7 @@ export interface RawExtraction {
   dueDate: string | null;
   maturityDate: string | null;
   nominee: string | null;
+  helpline?: string | null;
   confidence: Record<string, number>;
 }
 
@@ -92,6 +103,12 @@ export function parseDate(value: string | null | undefined): string | null {
   return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
+/** Keeps a phone number dialable: digits, +, spaces and dashes, 6–20 characters. */
+export function parseHelpline(value: string | null | undefined): string | null {
+  const t = (value ?? '').replace(/[^0-9+\s-]/g, '').replace(/\s+/g, ' ').trim();
+  return t.replace(/\D/g, '').length >= 6 && t.length <= 20 ? t : null;
+}
+
 function shortText(value: string | null | undefined, max = 80): string | null {
   const t = (value ?? '').trim().replace(/\s+/g, ' ');
   return t.length > 0 ? t.slice(0, max) : null;
@@ -108,6 +125,7 @@ export function normalizeExtraction(raw: RawExtraction): ExtractedFields {
     dueDate: parseDate(raw.dueDate),
     maturityDate: parseDate(raw.maturityDate),
     nominee: shortText(raw.nominee, 60),
+    helpline: parseHelpline(raw.helpline),
   };
   const confidence: Partial<Record<FieldKey, number>> = {};
   for (const key of FIELD_KEYS) {

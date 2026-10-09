@@ -61,14 +61,14 @@ export default function SignInScreen() {
         )
       }>
       <HeroCard
-        tint="peach"
+        tint="forest"
         icon={confirmation ? 'message-square' : 'smartphone'}
         back={router.canGoBack()}
         title={confirmation ? 'Enter your code' : 'Sign in'}
         subtitle={
           confirmation && phone
-            ? `We sent a 6-digit code to ${formatIndianMobile(phone)}.`
-            : 'Use your mobile number. No passwords to remember.'
+            ? `Sent to ${formatIndianMobile(phone)}`
+            : 'Just your mobile number. No passwords.'
         }
       />
 
@@ -97,7 +97,7 @@ export default function SignInScreen() {
       ) : (
         <Field
           label="Your mobile number"
-          hint="We’ll send a one-time code by SMS."
+          hint="We’ll text you a one-time code."
           value={phoneInput}
           onChangeText={setPhoneInput}
           keyboardType="phone-pad"
@@ -108,9 +108,7 @@ export default function SignInScreen() {
         />
       )}
 
-      <Notice tone="primary">
-        Family CFO never moves money and never asks for bank passwords.
-      </Notice>
+      <Notice tone="primary">Read-only. We never ask for bank passwords.</Notice>
     </Screen>
   );
 }

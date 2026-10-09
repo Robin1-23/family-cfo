@@ -1,7 +1,7 @@
-import { ITEM_TYPES, last4, parseDate, parseRupees } from '../../functions/src/extraction';
+import { ITEM_TYPES, last4, parseDate, parseHelpline, parseRupees } from '../../functions/src/extraction';
 import type { DocType, FieldKey, Item, ItemType, VaultDocument } from './types';
 
-export { ITEM_TYPES };
+export { ITEM_TYPES, parseDate, parseRupees };
 
 export const ITEM_TYPE_LABELS: Record<ItemType, string> = {
   health_policy: 'Health insurance',
@@ -11,8 +11,51 @@ export const ITEM_TYPE_LABELS: Record<ItemType, string> = {
   accident_policy: 'Accident cover',
   vehicle_policy: 'Vehicle insurance',
   fixed_deposit: 'Fixed deposit',
+  savings_account: 'Savings account',
+  mutual_fund: 'Mutual funds',
+  stocks: 'Shares / demat',
+  epf: 'EPF',
+  ppf: 'PPF',
+  gold: 'Gold',
+  property: 'Property',
   loan: 'Loan / EMI',
   other: 'Other',
+};
+
+export type ItemGroup = 'insurance' | 'asset' | 'loan' | 'other';
+
+export const ITEM_GROUP: Record<ItemType, ItemGroup> = {
+  health_policy: 'insurance',
+  term_policy: 'insurance',
+  life_policy: 'insurance',
+  critical_illness_policy: 'insurance',
+  accident_policy: 'insurance',
+  vehicle_policy: 'insurance',
+  fixed_deposit: 'asset',
+  savings_account: 'asset',
+  mutual_fund: 'asset',
+  stocks: 'asset',
+  epf: 'asset',
+  ppf: 'asset',
+  gold: 'asset',
+  property: 'asset',
+  loan: 'loan',
+  other: 'other',
+};
+
+export const GROUP_LABELS: Record<ItemGroup, string> = {
+  insurance: 'Insurance',
+  asset: 'Savings and assets',
+  loan: 'Loans',
+  other: 'Other',
+};
+
+/** What the amount field means for each group. */
+export const AMOUNT_LABEL: Record<ItemGroup, string> = {
+  insurance: 'Cover amount (₹)',
+  asset: 'Current value (₹)',
+  loan: 'Amount still owed (₹)',
+  other: 'Amount (₹)',
 };
 
 /** Below this the confirm screen asks the user to double-check the field. */
@@ -28,6 +71,8 @@ export interface ItemDraft {
   dueDate: string;
   maturityDate: string;
   nominee: string;
+  helpline: string;
+  payerMemberId: string | null;
 }
 
 export type ItemData = Omit<Item, 'id' | 'createdAt'>;
@@ -38,6 +83,8 @@ const DOC_TO_ITEM: Partial<Record<DocType, ItemType>> = {
   life_policy: 'life_policy',
   vehicle_policy: 'vehicle_policy',
   fixed_deposit: 'fixed_deposit',
+  mutual_fund: 'mutual_fund',
+  property: 'property',
   loan: 'loan',
 };
 
@@ -75,6 +122,24 @@ export function draftFromDocument(doc: Pick<VaultDocument, 'docType' | 'extracte
     dueDate: formatDate(x?.dueDate ?? null),
     maturityDate: formatDate(x?.maturityDate ?? null),
     nominee: x?.nominee ?? '',
+    helpline: x?.helpline ?? '',
+    payerMemberId: null,
+  };
+}
+
+/** Prefills the form for editing a saved item. */
+export function draftFromItem(item: Item): ItemDraft {
+  return {
+    type: item.type,
+    provider: item.provider ?? '',
+    numberLast4: item.numberLast4 ?? '',
+    amount: item.amount != null ? inr.format(item.amount) : '',
+    premium: item.premium != null ? inr.format(item.premium) : '',
+    dueDate: formatDate(item.dueDate),
+    maturityDate: formatDate(item.maturityDate),
+    nominee: item.nominee ?? '',
+    helpline: item.helpline ?? '',
+    payerMemberId: item.payerMemberId ?? null,
   };
 }
 
@@ -87,7 +152,7 @@ export function lowConfidenceFields(doc: Pick<VaultDocument, 'extractedFields'> 
 /** Validates the form and builds the Firestore record. Mirrors the items rules in firestore.rules. */
 export function buildItem(
   draft: ItemDraft,
-  ctx: { memberId: string; uid: string; sourceDocId: string | null },
+  ctx: { memberId: string; uid: string; sourceDocId: string | null; lastPaidOn?: string | null; snoozedUntil?: string | null },
 ): { item: ItemData; errors: null } | { item: null; errors: Partial<Record<keyof ItemDraft, string>> } {
   const errors: Partial<Record<keyof ItemDraft, string>> = {};
   const text = (v: string, max: number) => v.trim().replace(/\s+/g, ' ').slice(0, max) || null;
@@ -97,6 +162,8 @@ export function buildItem(
     if (n === null) errors[key] = 'Enter an amount in rupees, like 5,00,000.';
     return n;
   };
+  const helpline = draft.helpline.trim() ? parseHelpline(draft.helpline) : null;
+  if (draft.helpline.trim() && !helpline) errors.helpline = 'Enter a phone number, like 1800 425 2255.';
   const date = (key: 'dueDate' | 'maturityDate') => {
     if (!draft[key].trim()) return null;
     const d = parseDate(draft[key]);
@@ -115,6 +182,10 @@ export function buildItem(
     dueDate: date('dueDate'),
     maturityDate: date('maturityDate'),
     nominee: text(draft.nominee, 60),
+    helpline,
+    payerMemberId: draft.payerMemberId,
+    lastPaidOn: ctx.lastPaidOn ?? null,
+    snoozedUntil: ctx.snoozedUntil ?? null,
     sourceDocId: ctx.sourceDocId,
     confirmedBy: ctx.uid,
   };

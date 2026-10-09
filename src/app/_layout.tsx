@@ -1,10 +1,10 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { Button, Centered, Text } from '@/components/ui';
+import { ToastProvider } from '@/components/toast';
 import { AuthProvider } from '@/providers/auth-provider';
 import { HouseholdProvider, useHousehold } from '@/providers/household-provider';
 import { signOut } from '@/services/auth';
@@ -12,13 +12,14 @@ import { signOut } from '@/services/auth';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const scheme = useColorScheme();
   return (
     <SafeAreaProvider>
-      <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <ThemeProvider value={DarkTheme}>
         <AuthProvider>
           <HouseholdProvider>
-            <RootNavigator />
+            <ToastProvider>
+              <RootNavigator />
+            </ToastProvider>
           </HouseholdProvider>
         </AuthProvider>
       </ThemeProvider>
@@ -55,6 +56,7 @@ function RootNavigator() {
       </Stack.Protected>
       <Stack.Protected guard={status === 'no_household'}>
         <Stack.Screen name="onboarding" />
+        <Stack.Screen name="join/[code]" />
       </Stack.Protected>
       <Stack.Protected guard={status === 'ready'}>
         <Stack.Screen name="(app)" />

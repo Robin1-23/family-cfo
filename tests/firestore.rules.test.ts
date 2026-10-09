@@ -205,7 +205,7 @@ describe('items', () => {
       item({ amount: -1 }),
       item({ amount: 12.5 }),
       item({ dueDate: '15/08/2026' }),
-      item({ type: 'savings_account' }),
+      item({ type: 'crypto_wallet' }),
       item({ confirmedBy: OTHER.uid }),
       item({ memberId: 'self', sourceDocId: 'd1' }),
       item({ extra: true }),
@@ -221,6 +221,70 @@ describe('items', () => {
     await setDoc(doc(db, 'households', 'h1', 'items', 'i1'), item());
     await assertSucceeds(updateDoc(doc(db, 'households', 'h1', 'items', 'i1'), { premium: 19000 }));
     await assertFails(updateDoc(doc(db, 'households', 'h1', 'items', 'i1'), { sourceDocId: 'd9' }));
+  });
+});
+
+describe('sprint 2 fields', () => {
+  const item = (overrides: Record<string, unknown> = {}) => ({
+    type: 'health_policy', memberId: 'mum', provider: 'Star Health', numberLast4: '4567', amount: 500000,
+    premium: 18000, dueDate: '2026-08-15', maturityDate: null, nominee: 'Ramesh', helpline: '1800 425 2255',
+    payerMemberId: 'self', lastPaidOn: null, snoozedUntil: null, sourceDocId: null,
+    confirmedBy: OWNER.uid, createdAt: serverTimestamp(), ...overrides,
+  });
+
+  it('accepts helpline, payer, paid and snooze fields, and the new asset types', async () => {
+    await createHouseholdAs(OWNER);
+    const db = as(OWNER);
+    await assertSucceeds(setDoc(doc(db, 'households', 'h1', 'items', 'i1'), item()));
+    for (const type of ['savings_account', 'mutual_fund', 'stocks', 'epf', 'ppf', 'gold', 'property']) {
+      await assertSucceeds(setDoc(doc(db, 'households', 'h1', 'items', type), item({ type, premium: null, dueDate: null })));
+    }
+    await assertSucceeds(updateDoc(doc(db, 'households', 'h1', 'items', 'i1'), { dueDate: '2027-08-15', lastPaidOn: '2026-08-10', snoozedUntil: null, confirmedBy: OWNER.uid }));
+  });
+  it('rejects a bad helpline, an unknown payer or a bad snooze date', async () => {
+    await createHouseholdAs(OWNER);
+    const db = as(OWNER);
+    await assertFails(setDoc(doc(db, 'households', 'h1', 'items', 'a'), item({ helpline: 'call me' })));
+    await assertFails(setDoc(doc(db, 'households', 'h1', 'items', 'b'), item({ payerMemberId: 'ghost' })));
+    await assertFails(setDoc(doc(db, 'households', 'h1', 'items', 'c'), item({ snoozedUntil: 'tomorrow' })));
+  });
+  it('validates member phone numbers', async () => {
+    await createHouseholdAs(OWNER);
+    const ref = doc(as(OWNER), 'households', 'h1', 'members', 'mum');
+    await assertSucceeds(updateDoc(ref, { phone: '+919811111111' }));
+    await assertSucceeds(updateDoc(ref, { phone: null }));
+    await assertFails(updateDoc(ref, { phone: '9811111111' }));
+    await assertFails(updateDoc(ref, { phone: '+14155550100' }));
+  });
+  it('keeps alerts and invites server-only', async () => {
+    await createHouseholdAs(OWNER);
+    const db = as(OWNER);
+    await assertSucceeds(getDoc(doc(db, 'households', 'h1', 'alerts', 'x')));
+    await assertFails(setDoc(doc(db, 'households', 'h1', 'alerts', 'x'), { status: 'sent' }));
+    await assertFails(setDoc(doc(db, 'invites', 'ABCD2345'), { householdId: 'h1', memberId: 'mum' }));
+    await assertFails(getDoc(doc(db, 'invites', 'ABCD2345')));
+  });
+});
+
+describe('ledger', () => {
+  const entry = (o: Record<string, unknown> = {}) => ({
+    payerMemberId: 'self', itemId: null, amount: 18400, date: '2026-10-09', note: 'Mummy premium',
+    createdBy: OWNER.uid, createdAt: serverTimestamp(), ...o,
+  });
+  it('accepts a payment from an editor and keeps entries append-only', async () => {
+    await createHouseholdAs(OWNER);
+    const db = as(OWNER);
+    await assertSucceeds(setDoc(doc(db, 'households', 'h1', 'ledger', 'e1'), entry()));
+    await assertFails(updateDoc(doc(db, 'households', 'h1', 'ledger', 'e1'), { amount: 1 }));
+  });
+  it('rejects bad amounts, unknown payers, other creators and strangers', async () => {
+    await createHouseholdAs(OWNER);
+    const db = as(OWNER);
+    await assertFails(setDoc(doc(db, 'households', 'h1', 'ledger', 'a'), entry({ amount: 0 })));
+    await assertFails(setDoc(doc(db, 'households', 'h1', 'ledger', 'b'), entry({ amount: 10.5 })));
+    await assertFails(setDoc(doc(db, 'households', 'h1', 'ledger', 'c'), entry({ payerMemberId: 'ghost' })));
+    await assertFails(setDoc(doc(db, 'households', 'h1', 'ledger', 'd'), entry({ createdBy: OTHER.uid })));
+    await assertFails(setDoc(doc(as(OTHER), 'households', 'h1', 'ledger', 'e'), entry({ createdBy: OTHER.uid })));
   });
 });
 

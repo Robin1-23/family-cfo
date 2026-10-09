@@ -6,6 +6,7 @@
  * households/{householdId}/members/{id}    -> Member
  * households/{householdId}/documents/{id}  -> VaultDocument
  * households/{householdId}/items/{id}      -> Item
+ * households/{householdId}/ledger/{id}     -> LedgerEntry
  * households/{householdId}/consents/{id}   -> ConsentRecord
  */
 
@@ -77,6 +78,8 @@ export interface Member {
   consentStatus: ConsentStatus;
   birthYear: number | null;
   city: string | null;
+  /** +91 mobile for WhatsApp reminders and the invite check. Optional; never shown in full to others. */
+  phone?: string | null;
   /** Self-reported answers from the onboarding health check (src/lib/health-check.ts). */
   healthCheck?: HealthCheck;
   createdAt?: TimestampLike;
@@ -127,16 +130,39 @@ export interface Item {
   dueDate: string | null;
   maturityDate: string | null;
   nominee: string | null;
+  /** Insurer or TPA helpline for Emergency Mode. */
+  helpline?: string | null;
+  /** Who pays it; reminders go to this member. Defaults to the household owner. */
+  payerMemberId?: string | null;
+  /** YYYY-MM-DD, set by "Mark paid". */
+  lastPaidOn?: string | null;
+  /** YYYY-MM-DD; reminders pause until then. */
+  snoozedUntil?: string | null;
   /** The vault document it was confirmed from, or null for manual entry. */
   sourceDocId: string | null;
   confirmedBy: string;
   createdAt?: TimestampLike;
 }
 
+/** One payment towards a family bill, for the sibling cost-split. */
+export interface LedgerEntry {
+  id: string;
+  payerMemberId: string;
+  /** The premium, EMI or bill it paid for, if any. */
+  itemId: string | null;
+  /** Whole rupees. */
+  amount: number;
+  /** YYYY-MM-DD */
+  date: string;
+  note: string | null;
+  createdBy: string;
+  createdAt?: TimestampLike;
+}
+
 export interface ConsentRecord {
   id: string;
   memberId: string;
-  source: 'vault_upload' | 'digilocker' | 'account_aggregator' | 'gmail';
+  source: 'family_link' | 'vault_upload' | 'digilocker' | 'account_aggregator' | 'gmail';
   purpose: string;
   scope: string[];
   grantedBy: string;

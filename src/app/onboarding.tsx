@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
@@ -23,6 +24,7 @@ export default function OnboardingScreen() {
   const [nextKey, setNextKey] = useState(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [inviteCode, setInviteCode] = useState('');
 
   const suggestedHouseholdName = ownerName.trim() ? `${ownerName.trim().split(' ')[0]}'s family` : 'My family';
 
@@ -63,11 +65,32 @@ export default function OnboardingScreen() {
   return (
     <Screen footer={<Button label="Create my family" onPress={submit} loading={busy} />}>
       <HeroCard
-        tint="lavender"
+        tint="lime"
         icon="users"
         title="Set up your family"
-        subtitle="Add the people whose money and cover you look after. You can add more later."
+        subtitle="You can add more people later."
       />
+
+      <Panel style={{ gap: space.sm }}>
+        <Text variant="label">Joining your family instead?</Text>
+        <View style={{ flexDirection: 'row', gap: space.sm, alignItems: 'flex-end' }}>
+          <View style={{ flex: 1 }}>
+            <Field
+              label="Invite code"
+              value={inviteCode}
+              onChangeText={(t) => setInviteCode(t.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
+              placeholder="ABCD2345"
+              autoCapitalize="characters"
+            />
+          </View>
+          <Button
+            label="Join"
+            kind="secondary"
+            disabled={inviteCode.length !== 8}
+            onPress={() => router.push({ pathname: '/join/[code]', params: { code: inviteCode } })}
+          />
+        </View>
+      </Panel>
 
       <Field label="Your name" value={ownerName} onChangeText={setOwnerName} placeholder="Priya Sharma" autoComplete="name" />
       <Field
@@ -123,8 +146,8 @@ export default function OnboardingScreen() {
                 borderRadius: 999,
                 borderWidth: 1,
                 borderStyle: 'dashed',
-                borderColor: p.peach,
-                backgroundColor: p.peachWash,
+                borderColor: p.amber,
+                backgroundColor: p.amberWash,
               }}>
               <Text variant="label">
                 + {RELATION_LABELS[rel]}

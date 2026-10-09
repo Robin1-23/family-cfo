@@ -2,14 +2,16 @@ import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Share, View } from 'react-native';
 
 import { DOC_TYPE_LABELS } from '@/lib/catalog';
 import { formatBytes } from '@/lib/files';
+import { formatDate, formatRupees } from '@/lib/items';
 import type { DocType, OcrStatus, VaultDocument } from '@/lib/types';
+import { callApi, type ShareLink } from '@/services/api';
 import { documentUrl } from '@/services/vault';
-import { radius, space, type, usePalette } from '@/theme/tokens';
-import { Button } from './ui';
+import { radius, space, usePalette } from '@/theme/tokens';
+import { Button, Text, pressFeedback } from './ui';
 
 const OCR_LABEL: Record<OcrStatus, string> = {
   pending: 'Waiting to be read',
@@ -19,19 +21,19 @@ const OCR_LABEL: Record<OcrStatus, string> = {
   failed: 'Couldn’t read details',
 };
 
-/** Insurance on dark cards, money on lavender, papers on peach. */
-const TONE: Record<DocType, 'dark' | 'lavender' | 'peach'> = {
+/** Insurance on dark cards, money on lime, papers on amber. */
+const TONE: Record<DocType, 'dark' | 'lime' | 'amber'> = {
   health_policy: 'dark',
   term_policy: 'dark',
   life_policy: 'dark',
   vehicle_policy: 'dark',
-  fixed_deposit: 'lavender',
-  mutual_fund: 'lavender',
-  loan: 'lavender',
-  property: 'peach',
-  id_document: 'peach',
-  tax: 'peach',
-  other: 'peach',
+  fixed_deposit: 'lime',
+  mutual_fund: 'lime',
+  loan: 'lime',
+  property: 'amber',
+  id_document: 'amber',
+  tax: 'amber',
+  other: 'amber',
 };
 
 const ICON: Record<DocType, 'heart' | 'umbrella' | 'shield' | 'truck' | 'trending-up' | 'credit-card' | 'home' | 'user' | 'file-text'> = {
@@ -52,7 +54,10 @@ export function DocumentRow({
   document,
   ownerName,
   editable = false,
+  householdId,
 }: {
+  /** Enables the share button (24-hour link). */
+  householdId?: string;
   document: VaultDocument;
   ownerName?: string;
   /** Shows "Confirm details" once OCR has finished (or failed). */
@@ -60,10 +65,27 @@ export function DocumentRow({
 }) {
   const p = usePalette();
   const [opening, setOpening] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const x = document.extractedFields;
+  const facts = x ? [x.provider, x.amount != null && formatRupees(x.amount), x.dueDate && `due ${formatDate(x.dueDate)}`].filter(Boolean).join(' · ') : '';
+
+  /** A link that works for 24 hours, for a sibling or the hospital desk. */
+  async function share() {
+    if (!householdId) return;
+    setSharing(true);
+    try {
+      const { links, hours } = await callApi<{ links: ShareLink[]; hours: number }>('/share-links', { householdId, docIds: [document.id] });
+      if (links[0]) await Share.share({ message: `${document.title}\n${links[0].url}\n\n(Link works for ${hours} hours. Shared from Family CFO.)` });
+    } catch (e) {
+      Alert.alert('Couldn’t create a link', (e as Error).message);
+    } finally {
+      setSharing(false);
+    }
+  }
   const tone = TONE[document.docType];
-  const bg = tone === 'dark' ? p.bar : tone === 'lavender' ? p.lavender : p.peach;
+  const bg = tone === 'dark' ? p.bar : tone === 'lime' ? p.lime : p.amber;
   const fg = tone === 'dark' ? p.onBar : p.onTint;
-  const accent = tone === 'dark' ? p.peach : p.onTint;
+  const accent = tone === 'dark' ? p.amber : p.onTint;
   const needsDetails = editable && (document.ocrStatus === 'extracted' || document.ocrStatus === 'failed');
 
   async function open() {
@@ -87,72 +109,106 @@ export function DocumentRow({
       onPress={open}
       style={({ pressed }) => ({
         backgroundColor: bg,
-        borderRadius: 30,
-        padding: space.lg + 2,
+        borderRadius: radius.lg,
+        padding: space.lg,
         gap: space.md,
-        opacity: pressed ? 0.9 : 1,
         overflow: 'hidden',
+        ...pressFeedback(pressed),
       })}>
       <View
         style={{
           position: 'absolute',
-          right: -40,
-          top: -40,
-          width: 150,
-          height: 150,
-          borderRadius: 75,
-          borderWidth: 18,
+          right: -36,
+          bottom: -48,
+          width: 130,
+          height: 130,
+          borderRadius: 65,
+          borderWidth: 14,
           borderColor: tone === 'dark' ? p.barActive : p.surface,
-          opacity: tone === 'dark' ? 0.6 : 0.2,
+          opacity: tone === 'dark' ? 0.7 : 0.18,
         }}
       />
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
         <View
           style={{
-            width: 44,
-            height: 44,
-            borderRadius: 22,
+            width: 36,
+            height: 36,
+            borderRadius: 18,
             borderWidth: 1,
             borderColor: tone === 'dark' ? p.inkSoft : p.onTint,
             alignItems: 'center',
             justifyContent: 'center',
           }}>
-          <Feather name={ICON[document.docType]} size={19} color={accent} />
+          <Feather name={ICON[document.docType]} size={16} color={accent} />
         </View>
+        <Text variant="overline" style={{ color: accent, flex: 1 }} numberOfLines={1}>
+          {overline}
+        </Text>
+        {householdId ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Share ${document.title}`}
+            onPress={share}
+            hitSlop={6}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: radius.sm,
+              borderWidth: 1,
+              borderColor: tone === 'dark' ? p.inkSoft : p.onTint,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            {sharing ? <ActivityIndicator size="small" color={accent} /> : <Feather name="share-2" size={14} color={tone === 'dark' ? p.onBar : p.onTint} />}
+          </Pressable>
+        ) : null}
         <View
           style={{
-            width: 40,
-            height: 40,
-            borderRadius: radius.sm + 4,
+            width: 32,
+            height: 32,
+            borderRadius: radius.sm,
             backgroundColor: tone === 'dark' ? p.surface : p.bar,
             alignItems: 'center',
             justifyContent: 'center',
           }}>
           {opening ? (
-            <ActivityIndicator color={tone === 'dark' ? p.ink : p.onBar} />
+            <ActivityIndicator size="small" color={tone === 'dark' ? p.ink : p.onBar} />
           ) : (
-            <Feather name="external-link" size={17} color={tone === 'dark' ? p.ink : p.onBar} />
+            <Feather name="external-link" size={14} color={tone === 'dark' ? p.ink : p.onBar} />
           )}
         </View>
       </View>
 
-      <View style={{ gap: 4 }}>
-        <RNText style={[type.caption, { color: accent, fontWeight: '700', letterSpacing: 0.3 }]} numberOfLines={1}>
-          {overline}
-        </RNText>
-        <RNText style={[type.heading, { color: fg, fontSize: 20, lineHeight: 25 }]} numberOfLines={2}>
+      <View style={{ gap: 2 }}>
+        <Text variant="heading" style={{ color: fg }} numberOfLines={2}>
           {document.title}
-        </RNText>
-        <RNText style={[type.caption, { color: fg, opacity: 0.8 }]}>
+        </Text>
+        <Text variant="caption" style={{ color: fg, opacity: 0.7 }}>
           {OCR_LABEL[document.ocrStatus]} · {formatBytes(document.sizeBytes)}
-        </RNText>
+        </Text>
       </View>
+
+      {facts ? (
+        <View
+          style={{
+            backgroundColor: tone === 'dark' ? p.barActive : p.surface,
+            borderRadius: radius.md,
+            paddingHorizontal: space.md,
+            paddingVertical: space.sm,
+            opacity: tone === 'dark' ? 1 : 0.85,
+          }}>
+          <Text variant="caption" style={{ color: tone === 'dark' ? p.onBar : p.ink, fontWeight: '600' }} numberOfLines={1}>
+            {facts}
+          </Text>
+        </View>
+      ) : null}
 
       {needsDetails ? (
         <Button
           label={document.ocrStatus === 'extracted' ? 'Confirm details' : 'Enter details'}
           kind="secondary"
-          style={{ minHeight: 42, alignSelf: 'flex-start', borderWidth: 0 }}
+          icon={document.ocrStatus === 'extracted' ? 'check' : 'edit-3'}
+          style={{ minHeight: 38, alignSelf: 'flex-start', borderWidth: 0, paddingHorizontal: space.md }}
           onPress={() => router.push({ pathname: '/item/new', params: { docId: document.id } })}
         />
       ) : null}

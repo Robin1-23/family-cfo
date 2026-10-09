@@ -192,13 +192,14 @@ Fields marked ✅ exist in code today (see `src/lib/types.ts`); the rest are pla
 | --- | --- | --- |
 | users/{uid} ✅ | phone, activeHouseholdId | Created on first sign-in |
 | households/{id} ✅ | name, ownerUid, plan, **roles {uid: role}**, createdAt | `roles` drives every security rule |
-| …/members/{memberId} ✅ | name, relation, uid, role, language, consentStatus, birthYear, city, healthCheck {healthCover, healthCoverBand, loans, termCover, fixedDeposits, papersWith} | Non-self members start as `viewer` + `pending` |
+| …/members/{memberId} ✅ | name, relation, uid, role, language, consentStatus, birthYear, city, phone (+91, for WhatsApp and invites), healthCheck {healthCover, healthCoverBand, loans, termCover, fixedDeposits, papersWith} | Non-self members start as `viewer` + `pending` |
 | …/documents/{docId} ✅ | memberId, docType, title, fileName, storagePath, contentType, sizeBytes, ocrStatus, uploadedBy | `ocrStatus` starts `pending`; only Functions advance it |
 | …/documents/{docId}.extractedFields ✅ | itemType, provider, numberLast4, amount, premium, dueDate, maturityDate, nominee, confidence {field: 0–1}; plus ocrError | Written only by the `extractDocument` Function (Claude, structured output); full numbers never stored |
-| …/items/{itemId} ✅ | type, memberId, provider, numberLast4, amount, premium, dueDate, maturityDate (YYYY-MM-DD), nominee, sourceDocId, confirmedBy | The single table every screen reads. Created only after the user confirms (or enters by hand); `onItemCreated` then marks the source document `confirmed` |
-| …/alerts/{alertId} | itemId, kind, dueAt, ownerMemberId, channel, status | Alert engine; Sprint 2 |
+| …/items/{itemId} ✅ | type (insurance, savings/asset, loan), memberId, provider, numberLast4, amount, premium, dueDate, maturityDate (YYYY-MM-DD), nominee, helpline, payerMemberId, lastPaidOn, snoozedUntil, sourceDocId, confirmedBy | The single table every screen reads. Created only after the user confirms (or enters by hand); `onItemCreated` then marks the source document `confirmed` |
+| …/alerts/{alertId} ✅ (read-only to clients) | itemId, kind, dueAt, daysLeft, ownerMemberId, channel (whatsapp / in_app), status | Written by the `dailyReminders` sweep; id = item+kind+date+offset so nothing is sent twice |
+| invites/{code} ✅ (server-only) | householdId, memberId, phone, createdBy, createdAt | 8-character code, 7-day expiry, redeemable only by the matching verified phone |
 | …/consents/{consentId} ✅ (read-only to clients) | memberId, source, purpose, scope, grantedAt, expiresAt, revokedAt | Modelled on the ReBIT AA artefact |
-| …/ledger/{entryId} | payerMemberId, itemId, amount, date | Sibling cost-split; V2 |
+| …/ledger/{entryId} ✅ | payerMemberId, itemId, amount, date, note, createdBy | Sibling cost-split; append-only; "Mark paid" writes one automatically |
 
 ## Monetization and pricing
 
@@ -253,8 +254,9 @@ V3 (months 10+)   Expert desk, insurance repositories, Bima Sugam, succession ki
 | Sprint | Scope | Status |
 | --- | --- | --- |
 | 1 · Foundation | Phone OTP, onboarding, households/members, roles + rules, vault upload, dashboard, member profile, WhatsApp invite, settings | ✅ Shipped (commit b627e09) |
-| 2 · Core value | OCR extraction Function + confirm screen, items collection, Welcome screen, quick health check → first Coverage Score | ✅ Built, not yet deployed |
-| 2 · Core value (cont.) | Coverage Radar, alert engine + WhatsApp, Emergency Mode, Hindi parent view, parent invite/consent flow | Next |
+| 2 · Core value | OCR extraction + confirm, items, Welcome, health check, Coverage Radar, Timeline + daily WhatsApp reminders, Emergency Mode, Hindi parent view, invite/consent flow, Consent centre (export, delete, leave), vault search + 24h share links | ✅ Built, not yet deployed or device-tested |
+| V2 / V3 preview | Net Worth Map, Ask Family CFO, Shared Contributions, Tax Helper (2025 Act wording, Form 121), Mis-sold Policy Check (return vs deposit), Nominee audit + will checklist, Home "For you" insights | ✅ Built from entered data (no AA yet) |
+| Not built | Voice read-out in the parent view (needs expo-speech), push for the earner (needs expo-notifications), score-change animation with reasons, AA / DigiLocker / Gmail, subscriptions | Needs packages or partners |
 | 3 · Beta | Subscriptions (Play Billing/Razorpay), Free-tier limits, analytics, security review, marketing site | Planned |
 
 ## Sources

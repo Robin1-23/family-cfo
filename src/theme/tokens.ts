@@ -1,84 +1,93 @@
-import { useColorScheme } from 'react-native';
+import { Platform } from 'react-native';
 
 /**
- * Family CFO palette: warm peach, soft lavender and charcoal on an off-white
- * canvas. Big rounded cards, dark pill buttons, a floating dark tab bar.
- * Peach is for anything that is due or missing; lavender for what is in place.
+ * Family CFO palette: "forest and lime". Deep green-black surfaces, one bright
+ * lime for the brand and anything that is in place, amber only for what is due
+ * or missing, red only for emergencies. One dark theme everywhere, so every
+ * screen feels the same at night and in daylight.
  */
-const light = {
-  bg: '#F5F3F0',
-  surface: '#FFFFFF',
-  surfaceSunk: '#EEECE8',
-  ink: '#1E1E24',
-  inkSoft: '#5D5C66',
-  inkFaint: '#9B9AA3',
-  line: '#E5E2DD',
-  /** Buttons, the tab bar and other solid controls. */
-  primary: '#26262D',
-  primaryInk: '#FFFFFF',
-  primaryWash: '#ECEAF9',
-  peach: '#F49A5E',
-  peachDeep: '#B9551D',
-  peachWash: '#FCE9DC',
-  lavender: '#8F8BEA',
-  lavenderDeep: '#4E49B5',
-  lavenderWash: '#E8E7FC',
-  due: '#F49A5E',
-  dueWash: '#FCE9DC',
-  danger: '#C2321F',
-  dangerWash: '#FBE2DD',
-  /** The floating tab bar stays dark in both modes. */
-  bar: '#26262D',
-  barActive: '#0D0D11',
-  /** Text on peach or lavender fills: always dark, for contrast in both modes. */
-  onTint: '#1E1E24',
-  onBar: '#FFFFFF',
+const palette = {
+  bg: '#0A120A',
+  surface: '#141E12',
+  surfaceSunk: '#1C2819',
+  ink: '#EEF5E6',
+  /** Secondary text, tinted green so the palette stays one family. */
+  inkSoft: '#B4C4A8',
+  /** Faint text: #7D8C75 on bg is ~4.6:1, passing WCAG AA for small text. */
+  inkFaint: '#7D8C75',
+  line: '#26341F',
+  /** Main buttons: lime with near-black text. */
+  primary: '#C9F25C',
+  primaryInk: '#0A120A',
+  primaryWash: '#22301A',
+  lime: '#C9F25C',
+  /** The lighter lime of an inner card sitting on a lime panel. */
+  limeSoft: '#DDF68F',
+  /** Gradient ends for lime panels: top-left highlight to bottom-right depth. */
+  limeHi: '#DCF77A',
+  limeLo: '#B3DF3C',
+  limeDeep: '#C9F25C',
+  limeWash: '#1F2E14',
+  amber: '#F5B544',
+  amberDeep: '#F5B544',
+  amberWash: '#33280F',
+  /** Deep green panels: the quieter hero. */
+  forest: '#1D3A17',
+  forestDeep: '#2B5222',
+  forestHi: '#26491D',
+  due: '#F5B544',
+  dueWash: '#33280F',
+  danger: '#FF6B5B',
+  dangerWash: '#3A1A16',
+  /** Floating tab bar and dark buttons on lime. */
+  bar: '#121B10',
+  barActive: '#0A120A',
+  /** Text on lime or amber fills. */
+  onTint: '#0A120A',
+  /** Text on dark or forest fills. */
+  onBar: '#EEF5E6',
+  shadow: '0px 10px 30px rgba(0, 0, 0, 0.35)',
+  /** Emergency Mode red; white text stays readable on it. */
+  emergency: '#C0281C',
+  /** The SOS button: brighter than danger so it stands apart, with a soft glow. */
+  sos: '#FF4D3D',
+  sosGlow: '0px 0px 18px rgba(255, 77, 61, 0.55)',
+  emergencyDeep: '#8F1D14',
 };
 
-const dark: typeof light = {
-  bg: '#141418',
-  surface: '#1E1E24',
-  surfaceSunk: '#2A2A31',
-  ink: '#F2F1EF',
-  inkSoft: '#B5B4BC',
-  inkFaint: '#7C7B85',
-  line: '#33333B',
-  primary: '#F2F1EF',
-  primaryInk: '#141418',
-  primaryWash: '#2D2C45',
-  peach: '#F4A672',
-  peachDeep: '#F8C29E',
-  peachWash: '#3D2A1E',
-  lavender: '#A19EF0',
-  lavenderDeep: '#C9C7F7',
-  lavenderWash: '#2B2A47',
-  due: '#F4A672',
-  dueWash: '#3D2A1E',
-  danger: '#F2725F',
-  dangerWash: '#3D1F1B',
-  bar: '#2C2C34',
-  barActive: '#0D0D11',
-  onTint: '#1E1E24',
-  onBar: '#FFFFFF',
-};
-
-export type Palette = typeof light;
+export type Palette = typeof palette;
 
 export function usePalette(): Palette {
-  return useColorScheme() === 'dark' ? dark : light;
+  return palette;
 }
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
 
-export const radius = { sm: 10, md: 18, lg: 28, pill: 999 } as const;
+export const radius = { sm: 10, md: 14, lg: 24, xl: 28, pill: 999 } as const;
 
-/** Type scale (~1.25 ratio). Numbers use tabular figures so amounts line up. */
+/**
+ * Plus Jakarta Sans, embedded at build time by the expo-font plugin (app.json).
+ * Android registers it as one family with five weights; iOS uses the family name
+ * inside the font file. fontWeight picks the face on both.
+ */
+export const FONT = Platform.select({ android: 'PlusJakartaSans', ios: 'Plus Jakarta Sans', default: undefined });
+const f = { fontFamily: FONT };
+
+/**
+ * Type scale. Restrained on purpose: 20px titles, 14px body, 12px meta.
+ * Only hero numbers go big. Numbers use tabular figures so amounts line up.
+ */
 export const type = {
-  display: { fontSize: 34, lineHeight: 38, fontWeight: '800' as const, letterSpacing: -0.8 },
-  title: { fontSize: 26, lineHeight: 31, fontWeight: '800' as const, letterSpacing: -0.5 },
-  heading: { fontSize: 18, lineHeight: 24, fontWeight: '700' as const, letterSpacing: -0.2 },
-  body: { fontSize: 16, lineHeight: 23, fontWeight: '400' as const },
-  label: { fontSize: 14, lineHeight: 19, fontWeight: '600' as const },
-  caption: { fontSize: 13, lineHeight: 18, fontWeight: '400' as const },
+  display: { ...f, fontSize: 30, lineHeight: 34, fontWeight: '800' as const, letterSpacing: -1.2 },
+  title: { ...f, fontSize: 20, lineHeight: 26, fontWeight: '700' as const, letterSpacing: -0.4 },
+  heading: { ...f, fontSize: 16, lineHeight: 21, fontWeight: '600' as const, letterSpacing: -0.2 },
+  body: { ...f, fontSize: 14, lineHeight: 20, fontWeight: '400' as const },
+  label: { ...f, fontSize: 13, lineHeight: 18, fontWeight: '600' as const },
+  caption: { ...f, fontSize: 12, lineHeight: 16, fontWeight: '400' as const },
+  /** Small spaced-out label above a title, e.g. "HEALTH INSURANCE · SUNITA". */
+  overline: { ...f, fontSize: 10.5, lineHeight: 14, fontWeight: '700' as const, letterSpacing: 0.9, textTransform: 'uppercase' as const, opacity: 0.75 },
   number: { fontVariant: ['tabular-nums' as const] },
 };
+
+/** Largest system font scale we honour, so big accessibility text never breaks a card. */
+export const MAX_FONT_SCALE = 1.35;

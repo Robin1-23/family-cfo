@@ -11,7 +11,7 @@ import {
   writeBatch,
 } from '@react-native-firebase/firestore';
 
-import type { HealthCheck, Household, Language, Member, Relation, Role, UserProfile } from '@/lib/types';
+import type { ConsentRecord, HealthCheck, Household, Language, Member, Relation, Role, UserProfile } from '@/lib/types';
 import { db } from './firebase';
 
 type Unsubscribe = () => void;
@@ -23,6 +23,7 @@ export interface NewMemberInput {
   language?: Language;
   birthYear?: number | null;
   city?: string | null;
+  phone?: string | null;
 }
 
 export function subscribeUserProfile(
@@ -70,7 +71,10 @@ export async function createHousehold(params: {
   });
 
   const ownerRef = doc(collection(db, 'households', householdRef.id, 'members'));
-  batch.set(ownerRef, memberData({ name: params.ownerName, relation: 'self', role: 'owner', language: params.ownerLanguage }, params.uid));
+  batch.set(
+    ownerRef,
+    memberData({ name: params.ownerName, relation: 'self', role: 'owner', language: params.ownerLanguage, phone: params.phone }, params.uid),
+  );
 
   for (const m of params.family) {
     const ref = doc(collection(db, 'households', householdRef.id, 'members'));
@@ -94,6 +98,7 @@ function memberData(input: NewMemberInput, uid: string | null) {
     consentStatus: isSelf ? 'self' : 'pending',
     birthYear: input.birthYear ?? null,
     city: input.city?.trim() || null,
+    phone: input.phone ?? null,
     createdAt: serverTimestamp(),
   };
 }
@@ -107,7 +112,7 @@ export async function addMember(householdId: string, input: NewMemberInput): Pro
 export async function updateMember(
   householdId: string,
   memberId: string,
-  patch: Partial<Pick<Member, 'name' | 'relation' | 'language' | 'birthYear' | 'city'>>,
+  patch: Partial<Pick<Member, 'name' | 'relation' | 'language' | 'birthYear' | 'city' | 'phone'>>,
 ): Promise<void> {
   await updateDoc(doc(db, 'households', householdId, 'members', memberId), patch);
 }
@@ -141,6 +146,18 @@ export function subscribeMembers(
   return onSnapshot(
     query(collection(db, 'households', householdId, 'members'), orderBy('createdAt', 'asc')),
     (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Member, 'id'>) }))),
+    onError,
+  );
+}
+
+export function subscribeConsents(
+  householdId: string,
+  onData: (consents: ConsentRecord[]) => void,
+  onError: (e: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    collection(db, 'households', householdId, 'consents'),
+    (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ConsentRecord, 'id'>) }))),
     onError,
   );
 }

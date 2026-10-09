@@ -21,12 +21,12 @@ Family CFO is an Elvyen app: a read-only family-finance command centre for the I
 
 ```
 src/app/            Expo Router screens (routes only)
-src/components/     ui.tsx (Text, Screen, Button, Field, ChipGroup, Panel, Notice), SafetyStrip, rows
+src/components/     ui.tsx (Text, Screen, Button, Field, ChipGroup, Panel, Notice, HeroCard, GradientFill, ScoreRing, Amount, Skeleton, EmptyState), toast.tsx (useToast, with Undo), haptics.ts (tap, success, heavy), SafetyStrip, rows
 src/lib/            pure logic — types, catalog, phone, files, permissions, readiness (unit tested)
 src/providers/      AuthProvider, HouseholdProvider (live Firestore listeners → useHousehold())
 src/services/       all Firebase calls (React Native Firebase v26, modular API)
-functions/            Cloud Functions: extractDocument (OCR via Claude), onItemCreated; pure parsing in extraction.ts
-src/theme/tokens.ts peach / lavender / charcoal palette, spacing, type scale — use tokens, no raw hex in screens
+functions/            Cloud Functions: extractDocument (OCR), onItemCreated, api (invites, consent, share links, delete, ask), dailyReminders (WhatsApp). Pure, unit-tested logic: extraction.ts, alerts.ts, invite.ts, ask.ts
+src/theme/tokens.ts forest-and-lime palette, spacing, type scale — use tokens, no raw hex in screens
 firestore.rules / storage.rules   authorisation from households/{id}.roles
 tests/              lib.test.ts (npm test), firestore.rules.test.ts (npm run test:rules, needs emulator)
 ```
@@ -37,7 +37,7 @@ tests/              lib.test.ts (npm test), firestore.rules.test.ts (npm run tes
 - Any new Firestore field or collection: update `src/lib/types.ts`, `firestore.rules`, the rules tests, and the data model table in the spec.
 - Mirror rule logic client-side in `src/lib/permissions.ts` / `src/lib/files.ts` so the UI never offers an action the rules will reject.
 - Copy is plain, sentence case, user-facing (Hindi where the member's `language` is `hi`). Errors say what happened and how to fix it.
-- Design: warm, rounded and card-led — big 28–34px cards on an off-white canvas, peach for what's due or missing, lavender for what's in place, charcoal pill buttons and a floating dark tab bar. Text on peach/lavender uses `onTint`; on dark cards `onBar`.
+- Design: "forest and lime", one dark theme. Deep green-black surfaces (`bg`, `surface`), one lime brand colour for the hero panel, primary buttons and anything in place; amber only for what's due or missing; red only for emergencies. On lime, text is `onTint` and buttons use `kind="dark"`; on dark, text is `ink`/`onBar`. Type stays calm: 14px body, 12px meta, 16px card titles, 24px hero titles; only hero numbers go big. One short line per description. Cards use the `shadow` token, tappables use `pressFeedback`, all text goes through `Text` (capped at `MAX_FONT_SCALE`). Polish rules: lime panels use `GradientFill`; lists load with `SkeletonList` and empty with `EmptyState`; saves confirm with a toast (offer Undo when it's reversible) and `success()`; buttons and chips already `tap()`; forms open as form sheets; list rows get hairline dividers; joined/pending people show an `Avatar` status dot.
 
 ## Before you commit
 
@@ -48,4 +48,4 @@ npm run test:rules   # whenever firestore.rules changes (needs Java + emulator)
 
 ## Next up (Sprint 2)
 
-Coverage Radar (read from `items`) → alert engine with WhatsApp → Emergency Mode → Hindi parent view → parent invite/consent flow. Details in the spec's roadmap.
+Device testing and deploy (typecheck, lint, rules tests, then `firebase deploy`), voice read-out for parents (expo-speech), push for the earner (expo-notifications), then Sprint 3: subscriptions and free-tier limits → alert engine with WhatsApp → Emergency Mode → Hindi parent view → parent invite/consent flow. Details in the spec's roadmap.

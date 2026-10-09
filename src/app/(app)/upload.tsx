@@ -126,7 +126,7 @@ export default function UploadScreen() {
         icon="upload-cloud"
         back
         title="Add to vault"
-        subtitle="Snap a policy, FD receipt or ID. We’ll read the details for you to check."
+        subtitle="We’ll read the details for you."
       />
       <ChipGroup<string>
         label="Whose document?"
@@ -173,7 +173,7 @@ export default function UploadScreen() {
         )}
         {uploading ? (
           <View style={{ height: 6, borderRadius: radius.pill, backgroundColor: p.surfaceSunk, overflow: 'hidden' }}>
-            <View style={{ width: `${Math.round((progress ?? 0) * 100)}%`, height: '100%', backgroundColor: p.lavender }} />
+            <View style={{ width: `${Math.round((progress ?? 0) * 100)}%`, height: '100%', backgroundColor: p.lime }} />
           </View>
         ) : null}
       </View>
